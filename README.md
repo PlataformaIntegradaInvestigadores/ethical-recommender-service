@@ -73,3 +73,24 @@ texto se omiten. La primera ejecución descarga el modelo desde Hugging Face.
 Las ramas de trabajo iniciales son `main`, `develop` y `feat/setup-etl-pipeline`.
 Los CSV que estaban versionados se retiraron del índice, conservando los archivos
 locales en `data/raw/`; las versiones anteriores permanecen en el historial de Git.
+
+## Grupos de verdad de terreno y re-ranking ético
+
+```bash
+python infrastructure/scripts/01_filter_and_merge_authors.py
+python infrastructure/scripts/02_generate_embeddings.py --device cpu
+python -m infrastructure.scripts.03_mine_ground_truth_groups --max-k 0      # 0 = sin límite de k
+python -m infrastructure.scripts.04_run_rerank_experiment                  # evaluación estándar
+python -m infrastructure.scripts.04_run_rerank_experiment --leakage-free --tag _leakage_free
+python -m pytest -q tests
+```
+
+- `application/services/apriori_groups.py`: Apriori por niveles con tidsets (Eclat), poda anti-monótona,
+  guarda de hiper-autoría, marcas maximal/closed.
+- `application/services/evaluation_split.py`: partición leave-one-out con semilla.
+- `application/services/group_scoring.py`: agregación híbrida (Additive Utilitarian + Most Pleasure).
+- `application/services/fair_reranker.py`: re-ranking voraz MMR con tope institucional y cuota de baja visibilidad.
+- `application/services/ranking_metrics.py`: nDCG/P/Recall/HR, Gini-Simpson (m ≥ 2), exposición, NDKL.
+- `infrastructure/db/csv_sources.py`: afiliación principal, visibilidad (artículos y grado de coautoría).
+- Salidas en `data/processed/`: `ground_truth_groups.csv`, `loo_eval_split.csv`, `experiments/`.
+- Documentación: `documentacion/semanas-5-6-apriori-y-reranking.md`, `documentacion/resultados-apriori-reranking.md`.
