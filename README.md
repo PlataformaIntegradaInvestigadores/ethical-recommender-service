@@ -51,6 +51,25 @@ Python incluido en Codex (pandas 3.0.1). Para reproducir esa ejecución aquí:
 & "$env:USERPROFILE\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" -m unittest discover -s tests -v
 ```
 
+## Embeddings semánticos (Etapa 1)
+
+```powershell
+.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py
+```
+
+Lee `data/processed/filtered_authors_profiles.csv` y genera:
+
+- `data/processed/author_embeddings.npy`: matriz `float32` de forma
+  `(n_autores, dim)` con filas normalizadas L2 (similitud coseno = producto punto).
+- `data/processed/author_index_mapping.json`: `index_to_author_id[i]` es el
+  `author_id` de la fila `i`, junto con modelo, dimensión y estrategia de pooling.
+
+Cada perfil se divide en sus artículos (separados por una línea en blanco), cada
+artículo se codifica por separado con `sentence-transformers/all-MiniLM-L6-v2`
+(que trunca a 256 tokens) y el vector del autor es el promedio renormalizado de
+sus artículos. Opciones: `--model`, `--batch-size`, `--device`. Los autores sin
+texto se omiten. La primera ejecución descarga el modelo desde Hugging Face.
+
 Las ramas de trabajo iniciales son `main`, `develop` y `feat/setup-etl-pipeline`.
 Los CSV que estaban versionados se retiraron del índice, conservando los archivos
 locales en `data/raw/`; las versiones anteriores permanecen en el historial de Git.
