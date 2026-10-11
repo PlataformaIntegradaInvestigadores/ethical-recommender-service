@@ -80,10 +80,22 @@ locales en `data/raw/`; las versiones anteriores permanecen en el historial de G
 python infrastructure/scripts/01_filter_and_merge_authors.py
 python infrastructure/scripts/02_generate_embeddings.py --device cpu
 python -m infrastructure.scripts.03_mine_ground_truth_groups --max-k 0      # 0 = sin límite de k
-python -m infrastructure.scripts.04_run_rerank_experiment                  # evaluación estándar
+python -m infrastructure.scripts.04_run_rerank_experiment                  # evaluación estándar (minilm)
 python -m infrastructure.scripts.04_run_rerank_experiment --leakage-free --tag _leakage_free
+python -m infrastructure.scripts.04_run_rerank_experiment --model scincl --leakage-free --tag _leakage_free
 python -m pytest -q tests
 ```
+
+`04_run_rerank_experiment.py --model {minilm,specter2,scincl}` (defecto `minilm`) lee
+`data/processed/author_embeddings_<modelo>.npy` y `author_index_mapping_<modelo>.json`, generados con
+`02_generate_embeddings.py --model <modelo>`. Con `minilm`, si no existen, usa los nombres anteriores
+`author_embeddings.npy` / `author_index_mapping.json` (lo informa en el log). `--embeddings` y
+`--mapping` permiten indicar rutas explícitas. Se valida que filas e IDs coincidan, que la dimensión
+corresponda a la declarada y que el modelo del mapping sea el pedido. Las salidas incluyen el alias:
+`experiments/rerank_{summary,per_case,meta,results}_<modelo><tag>.*` (`--results-dir` cambia la carpeta).
+En `--leakage-free` los integrantes y el objetivo se re-codifican con el mismo modelo, pooling,
+longitud máxima y formato de entrada del mapping (`título[SEP]resumen` y `[CLS]` para SPECTER2/SciNCL;
+`--device auto|cuda|cpu`).
 
 - `application/services/apriori_groups.py`: Apriori por niveles con tidsets (Eclat), poda anti-monótona,
   guarda de hiper-autoría, marcas maximal/closed.

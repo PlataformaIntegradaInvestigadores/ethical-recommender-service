@@ -30,6 +30,12 @@ Parámetros: min_support = 3; artículos con más de 25 autores descartados (8 d
 
 Configuración común: 200 casos con semilla 42, α = 0,5, Top-N = 100, K = 20 (también se informa @10).
 
+Los resultados de esta sección se obtuvieron con `all-MiniLM-L6-v2` (`--model minilm`). Desde la
+comparativa de modelos, cada corrida escribe archivos con el alias del modelo, por ejemplo
+`experiments/rerank_summary_minilm.csv` o `rerank_summary_scincl_leakage_free.csv`, de modo que las
+corridas por modelo no se sobrescriben. Las tablas A y B se reproducen exactamente con
+`--model minilm` y `--model minilm --leakage-free --tag _leakage_free` (verificado el 2026-10-10).
+
 | Ajuste | λ | tope/inst. | p protegidos | piso de relevancia | modo |
 |---|---|---|---|---|---|
 | R0_solo_equidad | 1,0 | — | 0,2 | 0,5 | prefijo ⌊p·i⌋ |
