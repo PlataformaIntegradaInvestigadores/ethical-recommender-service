@@ -51,24 +51,67 @@ Python incluido en Codex (pandas 3.0.1). Para reproducir esa ejecución aquí:
 & "$env:USERPROFILE\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" -m unittest discover -s tests -v
 ```
 
-## Embeddings semánticos (Etapa 1)
+## Embeddings semánticos (Etapa 1) y estudio comparativo de modelos
 
 ```powershell
-.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py
+.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model minilm
+.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model specter2
+.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model scincl
+# prueba rápida con 20 autores (añade _sample20 al nombre de los archivos)
+.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model scincl --limit-authors 20
 ```
 
-Lee `data/processed/filtered_authors_profiles.csv` y genera:
+| `--model` | Modelo Hugging Face | Pooling por artículo | Longitud máx. | Entrada |
+|---|---|---|---|---|
+| `minilm` (defecto) | `sentence-transformers/all-MiniLM-L6-v2` | media de tokens | 256 | `título\nresumen` |
+| `specter2` | `allenai/specter2_base` | `[CLS]` | 512 | `título[SEP]resumen` |
+| `scincl` | `malteos/scincl` | `[CLS]` | 512 | `título[SEP]resumen` |
 
-- `data/processed/author_embeddings.npy`: matriz `float32` de forma
+Lee `data/processed/filtered_authors_profiles.csv` y genera, por modelo:
+
+- `data/processed/author_embeddings_<modelo>.npy`: matriz `float32` de forma
   `(n_autores, dim)` con filas normalizadas L2 (similitud coseno = producto punto).
-- `data/processed/author_index_mapping.json`: `index_to_author_id[i]` es el
-  `author_id` de la fila `i`, junto con modelo, dimensión y estrategia de pooling.
+  `dim` es 384 para `minilm` y 768 para `specter2` y `scincl`.
+- `data/processed/author_index_mapping_<modelo>.json`: `index_to_author_id[i]` es el
+  `author_id` de la fila `i`, junto con modelo, dimensión, pooling, longitud máxima,
+  dispositivo, GPU, versiones de torch/CUDA, fp16, batch size y tiempo transcurrido.
 
-Cada perfil se divide en sus artículos (separados por una línea en blanco), cada
-artículo se codifica por separado con `sentence-transformers/all-MiniLM-L6-v2`
-(que trunca a 256 tokens) y el vector del autor es el promedio renormalizado de
-sus artículos. Opciones: `--model`, `--batch-size`, `--device`. Los autores sin
-texto se omiten. La primera ejecución descarga el modelo desde Hugging Face.
+Cada perfil se divide en sus artículos (separados por una línea en blanco). SPECTER2 y SciNCL
+siguen sus tarjetas de modelo: `título + tokenizer.sep_token + resumen`, truncado a 512 tokens y
+embedding del token `[CLS]`, construido con un `Transformer` + `Pooling(cls)` explícito. MiniLM
+conserva la entrada y el pooling originales. Los textos repetidos (artículos en coautoría) se
+codifican una sola vez y el vector del autor es el promedio renormalizado de sus artículos.
+Al terminar, el script imprime el tiempo y una fila lista para `docs/execution_history.md`.
+
+Compatibilidad: `author_embeddings.npy` / `author_index_mapping.json` (ejecución #1) equivalen a la
+salida de `--model minilm`. Para seguir escribiendo esos nombres usar `--legacy-names`.
+
+Opciones: `--device {auto,cuda,cpu}` (defecto `auto`: usa CUDA si `torch.cuda.is_available()`,
+si no emite un WARNING y continúa en CPU; `--device cuda` sin GPU termina con error),
+`--batch-size` (defecto 128 para MiniLM y 32 para SPECTER2/SciNCL en GPU; ante un error de memoria
+CUDA se reduce a la mitad y se reintenta), `--fp16` / `--no-fp16` (fp16 activo por defecto en
+CUDA), `--input`, `--output-dir`, `--limit-authors N`. La primera ejecución descarga el modelo.
+
+SPECTER2: la tarjeta oficial recomienda cargar el adaptador de proximidad `allenai/specter2` sobre
+`allenai/specter2_base` con la librería `adapters`. Aquí se usa el modelo base, porque `adapters`
+exige `transformers` 4.x y es incompatible con la versión de `sentence-transformers` del proyecto.
+Evaluar el adaptador queda como trabajo futuro.
+
+### GPU / CUDA (Windows, NVIDIA RTX 3060)
+
+PyTorch se instala aparte para obtener la build con CUDA 12.6 (PyTorch 2.14.1 estable):
+
+```powershell
+.\.venv\Scripts\python.exe -m pip uninstall -y torch torchvision torchaudio
+.\.venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu126
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '-')"
+```
+
+La verificación debe mostrar algo como `2.14.1+cu126 12.6 True NVIDIA GeForce RTX 3060`.
+Requiere un controlador NVIDIA compatible con CUDA 12 (≥ 528.33 en Windows; se recomienda el
+controlador Game Ready/Studio más reciente). `nvidia-smi` muestra la versión instalada.
+La bitácora de ejecuciones está en `docs/execution_history.md`.
 
 Las ramas de trabajo iniciales son `main`, `develop` y `feat/setup-etl-pipeline`.
 Los CSV que estaban versionados se retiraron del índice, conservando los archivos
