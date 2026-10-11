@@ -105,3 +105,8 @@ corridas por modelo no se sobrescriben. Las tablas A y B se reproducen exactamen
 5. **R0 (solo equidad) casi no cuesta precisión** (nDCG@20 0,0789 → 0,0784), pero su efecto es pequeño (2,7 % → 3,4 % de protegidos) por la misma escasez de candidatos.
 6. **α:** la media utilitaria pura (α = 1) supera al híbrido y al máximo en esta tarea (nDCG@20 de 0,092 frente a 0,079 y 0,063).
 7. `--exclude-coauthors`, que excluye a los coautores frecuentes de la consulta, elimina al objetivo por definición (HR = 0 en todos los métodos). Es útil en producción, pero no se puede evaluar con este leave-one-out.
+
+## Comparativa de modelos de embeddings
+
+La comparación de MiniLM, SPECTER2 y SciNCL con los mismos 200 casos (estándar y sin fuga) está en
+`documentacion/comparativa-modelos-embeddings.md`.
