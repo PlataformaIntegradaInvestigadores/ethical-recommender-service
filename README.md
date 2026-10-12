@@ -124,3 +124,36 @@ La bitácora de ejecuciones está en `docs/execution_history.md`.
 Las ramas de trabajo iniciales son `main`, `develop` y `feat/setup-etl-pipeline`.
 Los CSV que estaban versionados se retiraron del índice, conservando los archivos
 locales en `data/raw/`; las versiones anteriores permanecen en el historial de Git.
+
+## Grupos de verdad de terreno y re-ranking ético
+
+```bash
+python infrastructure/scripts/01_filter_and_merge_authors.py
+python infrastructure/scripts/02_generate_embeddings.py --device cpu
+python -m infrastructure.scripts.03_mine_ground_truth_groups --max-k 0      # 0 = sin límite de k
+python -m infrastructure.scripts.04_run_rerank_experiment                  # evaluación estándar (minilm)
+python -m infrastructure.scripts.04_run_rerank_experiment --leakage-free --tag _leakage_free
+python -m infrastructure.scripts.04_run_rerank_experiment --model scincl --leakage-free --tag _leakage_free
+python -m pytest -q tests
+```
+
+`04_run_rerank_experiment.py --model {minilm,specter2,scincl}` (defecto `minilm`) lee
+`data/processed/author_embeddings_<modelo>.npy` y `author_index_mapping_<modelo>.json`, generados con
+`02_generate_embeddings.py --model <modelo>`. Con `minilm`, si no existen, usa los nombres anteriores
+`author_embeddings.npy` / `author_index_mapping.json` (lo informa en el log). `--embeddings` y
+`--mapping` permiten indicar rutas explícitas. Se valida que filas e IDs coincidan, que la dimensión
+corresponda a la declarada y que el modelo del mapping sea el pedido. Las salidas incluyen el alias:
+`experiments/rerank_{summary,per_case,meta,results}_<modelo><tag>.*` (`--results-dir` cambia la carpeta).
+En `--leakage-free` los integrantes y el objetivo se re-codifican con el mismo modelo, pooling,
+longitud máxima y formato de entrada del mapping (`título[SEP]resumen` y `[CLS]` para SPECTER2/SciNCL;
+`--device auto|cuda|cpu`).
+
+- `application/services/apriori_groups.py`: Apriori por niveles con tidsets (Eclat), poda anti-monótona,
+  guarda de hiper-autoría, marcas maximal/closed.
+- `application/services/evaluation_split.py`: partición leave-one-out con semilla.
+- `application/services/group_scoring.py`: agregación híbrida (Additive Utilitarian + Most Pleasure).
+- `application/services/fair_reranker.py`: re-ranking voraz MMR con tope institucional y cuota de baja visibilidad.
+- `application/services/ranking_metrics.py`: nDCG/P/Recall/HR, Gini-Simpson (m ≥ 2), exposición, NDKL.
+- `infrastructure/db/csv_sources.py`: afiliación principal, visibilidad (artículos y grado de coautoría).
+- Salidas en `data/processed/`: `ground_truth_groups.csv`, `loo_eval_split.csv`, `experiments/`.
+- Documentación: `documentacion/semanas-5-6-apriori-y-reranking.md`, `documentacion/resultados-apriori-reranking.md`.
