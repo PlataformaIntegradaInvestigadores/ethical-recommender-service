@@ -20,10 +20,20 @@ artículos, renormalizado a norma 1 (similitud coseno = producto punto).
 | # | Fecha | Script | Modelo | Input | Output | Hardware | Tiempo |
 |---|---|---|---|---|---|---|---|
 | 1 | Octubre 2026 | `02_generate_embeddings.py` | `sentence-transformers/all-MiniLM-L6-v2` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×384 (`author_embeddings.npy`, ~11.7 MB) | CPU | ~16 min |
-| 2 | _pendiente_ | `02_generate_embeddings.py --model specter2` | `allenai/specter2_base` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×768 (esperada) | GPU NVIDIA RTX 3060 (6 GB) | _pendiente_ |
-| 3 | _pendiente_ | `02_generate_embeddings.py --model scincl` | `malteos/scincl` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×768 (esperada) | GPU NVIDIA RTX 3060 (6 GB) | _pendiente_ |
+| 2 | 2026-10-10 | `02_generate_embeddings.py --model specter2` | `allenai/specter2_base` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×768 (`author_embeddings_specter2.npy`, ~23.4 MB) | GPU NVIDIA GeForce RTX 3060 Laptop (6 GB), fp16 | 5.3 min (319 s) |
+| 3 | 2026-10-10 | `02_generate_embeddings.py --model scincl` | `malteos/scincl` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×768 (`author_embeddings_scincl.npy`, ~23.4 MB) | GPU NVIDIA GeForce RTX 3060 Laptop (6 GB), fp16 | 4.0 min (242 s) |
 
 Al terminar, el script imprime una fila Markdown lista para pegar en la sección de detalle.
+
+Filas impresas por el script en las ejecuciones en GPU (equipo de René):
+
+| Fecha | Comando | Modelo | Pooling | Long. máx. | Hardware | torch / CUDA | Batch | fp16 | Salida | Tiempo |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-10 | 02_generate_embeddings.py --model specter2 | allenai/specter2_base | cls | 512 | GPU NVIDIA GeForce RTX 3060 Laptop GPU (6.0 GB) | torch 2.14.1+cu126 / CUDA 12.6 | 32 | sí | 7621×768 | 5.3 min (319 s) |
+| 2026-10-10 | 02_generate_embeddings.py --model scincl | malteos/scincl | cls | 512 | GPU NVIDIA GeForce RTX 3060 Laptop GPU (6.0 GB) | torch 2.14.1+cu126 / CUDA 12.6 | 32 | sí | 7621×768 | 4.0 min (242 s) |
+
+Frente a la ejecución #1 en CPU (~16 min con un modelo 6 capas y 256 tokens), la GPU procesó dos
+modelos de 12 capas y 512 tokens en 4–5 min cada uno (~151 textos/s).
 
 ---
 
@@ -40,6 +50,10 @@ Al terminar, el script imprime una fila Markdown lista para pegar en la sección
 > **Nota (re-ejecución en el servidor de análisis, no es la ejecución oficial):** al reproducir esta
 > misma ejecución en el servidor de análisis (8 núcleos de CPU, sin GPU) tomó ~5 min.
 
+> **Re-ejecución con el script refactorizado (2026-10-10):** René ejecutó `--model minilm` con la
+> nueva versión del script y confirmó que la matriz es idéntica a `author_embeddings.npy`; por eso
+> la ejecución #1 sigue siendo la referencia de MiniLM. Tiempo y hardware de esa re-ejecución: no registrados.
+
 > **Compatibilidad:** desde la refactorización del estudio comparativo, el script escribe
 > `author_embeddings_minilm.npy` / `author_index_mapping_minilm.json`. Ese par es equivalente al
 > `author_embeddings.npy` / `author_index_mapping.json` de esta ejecución (mismo modelo, misma entrada
@@ -51,45 +65,47 @@ Al terminar, el script imprime una fila Markdown lista para pegar en la sección
 
 | Campo | Valor |
 |---|---|
-| Fecha | |
-| Commit (`git rev-parse --short HEAD`) | |
-| Comando exacto | `python infrastructure/scripts/02_generate_embeddings.py --model specter2 --device cuda` |
+| Fecha | 2026-10-10 |
+| Commit (`git rev-parse --short HEAD`) | no registrado (rama `feat/models-comparative-study`) |
+| Comando exacto | `python infrastructure/scripts/02_generate_embeddings.py --model specter2` (dispositivo `auto` → CUDA) |
 | Modelo / HF id | `allenai/specter2_base` |
-| Revisión del modelo (hash HF) | |
+| Revisión del modelo (hash HF) | no registrado |
 | Pooling | `[CLS]` por artículo → media L2 por autor |
 | `max_seq_length` | 512 |
 | Formato de entrada | `título + [SEP] + resumen` |
-| Hardware / GPU / VRAM | NVIDIA GeForce RTX 3060, 6 GB |
-| Versión torch / CUDA | |
-| Batch size (final, tras reintentos OOM) | 32 (por defecto) |
-| fp16 | sí (por defecto en CUDA) |
-| Tiempo | |
-| VRAM pico | |
-| Forma y tamaño de salida | 7621×768 `float32` (~23.4 MB esperado) |
+| Hardware / GPU / VRAM | NVIDIA GeForce RTX 3060 Laptop GPU, 6.0 GB |
+| Versión torch / CUDA | torch 2.14.1+cu126 / CUDA 12.6 |
+| Batch size (final, tras reintentos OOM) | 32 (sin reintentos registrados) |
+| fp16 | sí |
+| Tiempo | 5.3 min (319.0 s), incluye la primera descarga del modelo (~440 MB) |
+| VRAM pico | no registrado |
+| Textos codificados | 33,477 textos únicos de 65,607 documentos artículo-autor (~151 textos/s) |
+| Forma y tamaño de salida | 7621×768 `float32` (~23.4 MB) |
 | Archivos generados | `author_embeddings_specter2.npy`, `author_index_mapping_specter2.json` |
-| Observaciones | Modelo base sin adaptador de proximidad (`allenai/specter2`); ver README. |
+| Observaciones | Modelo base sin adaptador de proximidad (`allenai/specter2`); ver README. Verificado contra la prueba de humo de 20 autores en CPU: diferencia máx. ~2e-4 (efecto de fp16). |
 
 ## Ejecución #3 — SciNCL (`malteos/scincl`)
 
 | Campo | Valor |
 |---|---|
-| Fecha | |
-| Commit (`git rev-parse --short HEAD`) | |
-| Comando exacto | `python infrastructure/scripts/02_generate_embeddings.py --model scincl --device cuda` |
+| Fecha | 2026-10-10 |
+| Commit (`git rev-parse --short HEAD`) | no registrado (rama `feat/models-comparative-study`) |
+| Comando exacto | `python infrastructure/scripts/02_generate_embeddings.py --model scincl` (dispositivo `auto` → CUDA) |
 | Modelo / HF id | `malteos/scincl` |
-| Revisión del modelo (hash HF) | |
+| Revisión del modelo (hash HF) | no registrado |
 | Pooling | `[CLS]` por artículo → media L2 por autor |
 | `max_seq_length` | 512 |
 | Formato de entrada | `título + [SEP] + resumen` |
-| Hardware / GPU / VRAM | NVIDIA GeForce RTX 3060, 6 GB |
-| Versión torch / CUDA | |
-| Batch size (final, tras reintentos OOM) | 32 (por defecto) |
-| fp16 | sí (por defecto en CUDA) |
-| Tiempo | |
-| VRAM pico | |
-| Forma y tamaño de salida | 7621×768 `float32` (~23.4 MB esperado) |
+| Hardware / GPU / VRAM | NVIDIA GeForce RTX 3060 Laptop GPU, 6.0 GB |
+| Versión torch / CUDA | torch 2.14.1+cu126 / CUDA 12.6 |
+| Batch size (final, tras reintentos OOM) | 32 (sin reintentos registrados) |
+| fp16 | sí |
+| Tiempo | 4.0 min (242.2 s), incluye la primera descarga del modelo (~440 MB) |
+| VRAM pico | no registrado |
+| Textos codificados | 33,477 textos únicos de 65,607 documentos artículo-autor |
+| Forma y tamaño de salida | 7621×768 `float32` (~23.4 MB) |
 | Archivos generados | `author_embeddings_scincl.npy`, `author_index_mapping_scincl.json` |
-| Observaciones | |
+| Observaciones | Verificado contra la prueba de humo de 20 autores en CPU: diferencia máx. ~2e-4 (efecto de fp16). |
 
 ---
 
