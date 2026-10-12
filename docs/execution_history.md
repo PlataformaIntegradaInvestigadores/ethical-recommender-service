@@ -11,6 +11,8 @@ Modelos del estudio:
 | `minilm` | `sentence-transformers/all-MiniLM-L6-v2` | Generalista (línea base) | media de tokens | 256 | `título\nresumen` |
 | `specter2` | `allenai/specter2_base` | Científico, basado en citas | token `[CLS]` | 512 | `título[SEP]resumen` |
 | `scincl` | `malteos/scincl` | Científico, grafo de citas contrastivo | token `[CLS]` | 512 | `título[SEP]resumen` |
+| `minilm-l12` | `sentence-transformers/all-MiniLM-L12-v2` | Generalista, 12 capas | media de tokens | 256 | `título\nresumen` |
+| `mpnet` | `sentence-transformers/all-mpnet-base-v2` | Generalista, base | media de tokens | 384 | `título\nresumen` |
 
 En los tres casos el vector del autor es el promedio de los embeddings L2-normalizados de sus
 artículos, renormalizado a norma 1 (similitud coseno = producto punto).
@@ -22,6 +24,8 @@ artículos, renormalizado a norma 1 (similitud coseno = producto punto).
 | 1 | Octubre 2026 | `02_generate_embeddings.py` | `sentence-transformers/all-MiniLM-L6-v2` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×384 (`author_embeddings.npy`, ~11.7 MB) | CPU | ~16 min |
 | 2 | 2026-10-10 | `02_generate_embeddings.py --model specter2` | `allenai/specter2_base` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×768 (`author_embeddings_specter2.npy`, ~23.4 MB) | GPU NVIDIA GeForce RTX 3060 Laptop (6 GB), fp16 | 5.3 min (319 s) |
 | 3 | 2026-10-10 | `02_generate_embeddings.py --model scincl` | `malteos/scincl` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×768 (`author_embeddings_scincl.npy`, ~23.4 MB) | GPU NVIDIA GeForce RTX 3060 Laptop (6 GB), fp16 | 4.0 min (242 s) |
+| 4 | _pendiente_ | `02_generate_embeddings.py --model minilm-l12` | `sentence-transformers/all-MiniLM-L12-v2` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×384 (esperada, ~11.7 MB) | GPU NVIDIA GeForce RTX 3060 Laptop (6 GB), fp16 | _pendiente_ |
+| 5 | _pendiente_ | `02_generate_embeddings.py --model mpnet` | `sentence-transformers/all-mpnet-base-v2` | 33,477 artículos únicos / 7,621 autores | Matriz 7621×768 (esperada, ~23.4 MB) | GPU NVIDIA GeForce RTX 3060 Laptop (6 GB), fp16 | _pendiente_ |
 
 Al terminar, el script imprime una fila Markdown lista para pegar en la sección de detalle.
 
@@ -107,6 +111,52 @@ modelos de 12 capas y 512 tokens en 4–5 min cada uno (~151 textos/s).
 | Archivos generados | `author_embeddings_scincl.npy`, `author_index_mapping_scincl.json` |
 | Observaciones | Verificado contra la prueba de humo de 20 autores en CPU: diferencia máx. ~2e-4 (efecto de fp16). |
 
+## Ejecución #4 — all-MiniLM-L12-v2 (`sentence-transformers/all-MiniLM-L12-v2`)
+
+| Campo | Valor |
+|---|---|
+| Fecha | |
+| Commit (`git rev-parse --short HEAD`) | |
+| Comando exacto | `.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model minilm-l12` |
+| Modelo / HF id | `sentence-transformers/all-MiniLM-L12-v2` |
+| Revisión del modelo (hash HF) | |
+| Pooling | media de tokens (configuración del hub) por artículo → media L2 por autor |
+| `max_seq_length` | 256 (el hub trae 128; se usa 256 como la tarjeta y la línea base) |
+| Formato de entrada | `título\nresumen` (igual que la línea base) |
+| Hardware / GPU / VRAM | NVIDIA GeForce RTX 3060 Laptop GPU, 6 GB |
+| Versión torch / CUDA | |
+| Batch size (final, tras reintentos OOM) | 128 (por defecto) |
+| fp16 | sí (por defecto en CUDA) |
+| Tiempo | |
+| VRAM pico | |
+| Textos codificados | |
+| Forma y tamaño de salida | 7621×384 `float32` (~11.7 MB esperado) |
+| Archivos generados | `author_embeddings_minilm-l12.npy`, `author_index_mapping_minilm-l12.json` |
+| Observaciones | |
+
+## Ejecución #5 — all-mpnet-base-v2 (`sentence-transformers/all-mpnet-base-v2`)
+
+| Campo | Valor |
+|---|---|
+| Fecha | |
+| Commit (`git rev-parse --short HEAD`) | |
+| Comando exacto | `.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model mpnet` |
+| Modelo / HF id | `sentence-transformers/all-mpnet-base-v2` |
+| Revisión del modelo (hash HF) | |
+| Pooling | media de tokens (configuración del hub) por artículo → media L2 por autor |
+| `max_seq_length` | 384 |
+| Formato de entrada | `título\nresumen` (igual que la línea base) |
+| Hardware / GPU / VRAM | NVIDIA GeForce RTX 3060 Laptop GPU, 6 GB |
+| Versión torch / CUDA | |
+| Batch size (final, tras reintentos OOM) | 64 (por defecto) |
+| fp16 | sí (por defecto en CUDA) |
+| Tiempo | |
+| VRAM pico | |
+| Textos codificados | |
+| Forma y tamaño de salida | 7621×768 `float32` (~23.4 MB esperado) |
+| Archivos generados | `author_embeddings_mpnet.npy`, `author_index_mapping_mpnet.json` |
+| Observaciones | |
+
 ---
 
 ## Plantilla para nuevas ejecuciones
@@ -152,6 +202,8 @@ La revisión del modelo es la carpeta de `snapshots` en
 |---|---|---|---|
 | 2026-10-10 | `--model scincl --limit-authors 20` | CPU servidor de análisis (8 núcleos) | 20×768, 239 artículos (236 únicos), 23.8 s, ~16.5 art./s |
 | 2026-10-10 | `--model specter2 --limit-authors 20` | CPU servidor de análisis (8 núcleos) | 20×768, 239 artículos (236 únicos), 22.4 s, ~17.3 art./s |
+| 2026-10-11 | `--model minilm-l12 --limit-authors 20` | CPU servidor de análisis (8 núcleos) | 20×384, 17.6 s (incluye carga); diferencia máx. 3.7e-8 frente a `SentenceTransformer.encode` oficial con 256 tokens |
+| 2026-10-11 | `--model mpnet --limit-authors 20` | CPU servidor de análisis (8 núcleos) | 20×768, 34.6 s (incluye carga); idéntico (diferencia 0.0) a `SentenceTransformer.encode` oficial |
 
 Ambas salidas coinciden (diferencia máx. < 1e-7) con la referencia de las tarjetas de los modelos
 (`transformers` + `last_hidden_state[:, 0, :]` + normalización L2). Al ritmo observado en CPU, una
