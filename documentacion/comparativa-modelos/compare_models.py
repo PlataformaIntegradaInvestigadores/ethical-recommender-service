@@ -112,3 +112,27 @@ extra_tab.to_csv(E / "model_comparison_protected_share.csv", index=False)
 with open(E / "model_comparison.md", "a", encoding="utf-8") as fh:
     fh.write("\n## Cuota de perfiles de baja visibilidad en el Top-20 de la línea base\n\n" + extra_tab.to_markdown(index=False) + "\n")
 print(extra_tab.to_markdown(index=False))
+
+# Robustness: leakage-free significance vs the reference for every alpha, baseline and R1
+rob = []
+for alpha, suffix in ((0.0, "_alpha0.0"), (0.5, ""), (1.0, "_alpha1.0")):
+    for method in ("baseline", "R1_suave"):
+        frames = {m: load(m, "_leakage_free" + suffix)[0].query("method == @method").set_index("group_id").sort_index()
+                  for m in MODELS}
+        for y in [m for m in MODELS if m != REF]:
+            x, z = frames[REF], frames[y]
+            for metric in ("HR@20", "nDCG@20"):
+                diff = (z[metric] - x[metric]).to_numpy()
+                boots = [diff[rng.integers(0, len(diff), len(diff))].mean() for _ in range(10000)]
+                entry = {"alpha": alpha, "lista": method, "comparación": f"{y} − {REF}", "métrica": metric,
+                         "Δ": diff.mean(), "IC95_lo": np.percentile(boots, 2.5), "IC95_hi": np.percentile(boots, 97.5)}
+                if metric == "HR@20":
+                    n01 = int(((x[metric] == 0) & (z[metric] == 1)).sum()); n10 = int(((x[metric] == 1) & (z[metric] == 0)).sum())
+                    entry["p_McNemar_exacto"] = binomtest(n01, n01 + n10, 0.5).pvalue if n01 + n10 else 1.0
+                if method == "baseline" and metric == "HR@20":
+                    entry["p_Wilcoxon_rango"] = wilcoxon(x["target_rank_full"], z["target_rank_full"]).pvalue
+                rob.append(entry)
+rob_tab = pd.DataFrame(rob).round(4)
+rob_tab.to_csv(E / "model_comparison_alpha_significance.csv", index=False)
+with open(E / "model_comparison.md", "a", encoding="utf-8") as fh:
+    fh.write("\n## Robustez: significancia sin fuga frente a la referencia por α (línea base y R1)\n\n" + rob_tab.to_markdown(index=False) + "\n")
