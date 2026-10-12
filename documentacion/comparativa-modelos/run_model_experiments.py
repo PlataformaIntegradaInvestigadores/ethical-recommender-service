@@ -1,4 +1,4 @@
-"""Uso: python documentacion/comparativa-modelos/run_model_experiments.py [minilm specter2 scincl]
+"""Uso: python documentacion/comparativa-modelos/run_model_experiments.py [alias ...]  (por defecto, los 5 modelos)
 
 Run 04_run_rerank_experiment for each model (standard + leakage-free, alpha sweep).
 
@@ -62,7 +62,10 @@ _load = exp.load_embeddings
 def load_spy(e, m):
     matrix, ids, meta = _load(e, m); state["row_of"] = {a: i for i, a in enumerate(ids)}; return matrix, ids, meta
 exp.load_embeddings = load_spy
-models = sys.argv[1:] or ["minilm", "specter2", "scincl"]
+models = sys.argv[1:] or list(exp.MODEL_IDS)
+unknown = [m for m in models if m not in exp.MODEL_IDS]
+if unknown:
+    sys.exit(f"Unknown model(s) {unknown}; choose from {list(exp.MODEL_IDS)}")
 for alias in models:
     for leakage in (False, True):
         for alpha in (0.5, 0.0, 1.0):

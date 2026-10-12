@@ -28,7 +28,8 @@ Top-N = 100, K = 20, ajustes R0–R3 sin cambios. Dos modos:
   entrada del alias. Es el número que debe citarse en la tesis.
 
 Archivos: `data/processed/experiments/rerank_*_{alias}{tag}.*` y `model_comparison*.{csv,md}`,
-`embedding_intrinsic_stats.csv`. Scripts reproducibles en `documentacion/comparativa-modelos/`.
+`embedding_intrinsic_stats.csv`. Scripts reproducibles en `documentacion/comparativa-modelos/`; `run_full_comparison.py` ejecuta todo
+el flujo para los modelos disponibles (incluidos `minilm-l12` y `mpnet` cuando existan sus embeddings).
 
 ## 2. Línea base (sin re-ranking)
 
@@ -97,14 +98,15 @@ IC 95 % [−1,6; −0,7], p < 0,001).
 | Coseno medio entre autores al azar (anisotropía) | 0,143 | 0,889 | 0,793 |
 | Desv. estándar del coseno al azar | 0,159 | 0,034 | 0,058 |
 | Coseno medio entre co-autores (pares frecuentes, soporte ≥ 3) | 0,814 | 0,982 | 0,966 |
-| Coseno medio, pares al azar de la misma institución | 0,266 | 0,909 | 0,828 |
-| Brecha co-autores − azar, en desviaciones estándar | 4,23 | 2,72 | 2,99 |
+| Coseno medio, pares al azar de la misma institución | 0,266 | 0,909 | 0,829 |
+| Brecha co-autores − azar, en desviaciones estándar | 4,23 | 2,73 | 2,99 |
 | AUC co-autores vs. azar | 0,995 | 0,995 | 0,994 |
-| AUC co-autores vs. misma institución | 0,943 | 0,947 | 0,942 |
+| AUC co-autores vs. misma institución | 0,943 | 0,947 | 0,941 |
 | Varianza en la 1.ª componente principal | 8,9 % | 13,2 % | 11,7 % |
 | Dimensión efectiva (participation ratio) | 42,0 | 24,3 | 26,3 |
 
-7 403 pares de co-autores, 300 000 pares al azar y 100 000 pares de la misma institución.
+7 403 pares de co-autores, 300 000 pares al azar y 100 000 pares de la misma institución; los pares
+muestreados son los mismos para todos los modelos (generador con semilla 42 por modelo).
 
 Limitación: los co-autores comparten artículos, así que su coseno también tiene fuga. Las AUC
 cercanas a 0,995 miden sobre todo texto compartido y no discriminan entre modelos. La evidencia

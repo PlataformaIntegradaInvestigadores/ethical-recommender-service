@@ -31,6 +31,8 @@ MODEL_IDS: Final[dict[str, str]] = {
     "minilm": "sentence-transformers/all-MiniLM-L6-v2",
     "specter2": "allenai/specter2_base",
     "scincl": "malteos/scincl",
+    "minilm-l12": "sentence-transformers/all-MiniLM-L12-v2",
+    "mpnet": "sentence-transformers/all-mpnet-base-v2",
 }
 DEFAULT_MODEL_ALIAS: Final[str] = "minilm"
 # Legacy mappings (pre comparative study) only store model_name/pooling: assume the MiniLM run.

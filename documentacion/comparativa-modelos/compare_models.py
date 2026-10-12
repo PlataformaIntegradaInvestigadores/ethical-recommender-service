@@ -1,9 +1,26 @@
-"""Requiere pandas, scipy y tabulate. Cross-model comparison table + paired significance on the same 200 LOO cases."""
-import json, itertools
+"""Requiere pandas, scipy y tabulate. Cross-model comparison table + paired significance on the same 200 LOO cases.
+
+Uso: python documentacion/comparativa-modelos/compare_models.py [--models ...] [--reference minilm] [--all-pairs]
+Por defecto compara cada modelo contra la referencia (minilm); --all-pairs compara todos los pares.
+"""
+import argparse, importlib, json, itertools, sys
+from pathlib import Path
 import numpy as np, pandas as pd
 from scipy.stats import binomtest, wilcoxon
 E = __import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "processed" / "experiments"
-MODELS = ["minilm", "specter2", "scincl"]
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+exp = importlib.import_module("infrastructure.scripts.04_run_rerank_experiment")
+parser = argparse.ArgumentParser()
+parser.add_argument("--models", nargs="+", choices=list(exp.MODEL_IDS), default=list(exp.MODEL_IDS))
+parser.add_argument("--reference", default="minilm", choices=list(exp.MODEL_IDS))
+parser.add_argument("--all-pairs", action="store_true")
+ARGS = parser.parse_args()
+MODELS = list(dict.fromkeys([ARGS.reference, *ARGS.models]))
+REF = ARGS.reference
+PAIRS = list(itertools.combinations(MODELS, 2)) if ARGS.all_pairs else [(REF, m) for m in MODELS if m != REF]
+missing = [f"rerank_summary_{m}{t}.csv" for m in MODELS for t in ("", "_leakage_free") if not (E / f"rerank_summary_{m}{t}.csv").is_file()]
+if missing:
+    sys.exit("Faltan resultados de 04 (ejecutar run_model_experiments.py): " + ", ".join(missing))
 rng = np.random.default_rng(42)
 
 def load(alias, tag=""):
@@ -46,8 +63,8 @@ sweep_tab = pd.DataFrame(sweep).pivot_table(index=["modo", "modelo"], columns="a
 sig = []
 for mode in ("estándar", "sin fuga"):
     b = {m: per[(mode, m)].query("method == 'baseline'").set_index("group_id").sort_index() for m in MODELS}
-    assert all((b[m].index == b["minilm"].index).all() for m in MODELS)
-    for x, y in itertools.combinations(MODELS, 2):
+    assert all((b[m].index == b[REF].index).all() for m in MODELS), "models were evaluated on different cases"
+    for x, y in PAIRS:
         for metric in ("HR@20", "HR@10", "nDCG@20"):
             dx, dy = b[x][metric].to_numpy(), b[y][metric].to_numpy()
             diff = dy - dx
@@ -70,6 +87,7 @@ rer_tab.to_csv(E / "model_comparison_rerank.csv", index=False)
 sweep_tab.to_csv(E / "model_comparison_alpha_sweep.csv")
 sig_tab.to_csv(E / "model_comparison_significance.csv", index=False)
 intr = pd.read_csv(E / "embedding_intrinsic_stats.csv", index_col=0)
+intr = intr.loc[[m for m in MODELS if m in intr.index]]
 md = ["# Comparativa de modelos de embeddings (200 casos LOO, semilla 42, α=0,5, Top-N=100)", "",
       "## Línea base", "", base_tab.to_markdown(index=False), "",
       "## Re-ranking", "", rer_tab.to_markdown(index=False), "",
@@ -83,10 +101,10 @@ print("\n".join(md))
 extra = []
 for mode in ("estándar", "sin fuga"):
     b = {m: per[(mode, m)].query("method == 'baseline'").set_index("group_id").sort_index() for m in MODELS}
-    for y in ("specter2", "scincl"):
-        diff = (b[y]["ProtectedShare@20"] - b["minilm"]["ProtectedShare@20"]).to_numpy()
+    for y in [m for m in MODELS if m != REF]:
+        diff = (b[y]["ProtectedShare@20"] - b[REF]["ProtectedShare@20"]).to_numpy()
         boots = [diff[rng.integers(0, len(diff), len(diff))].mean() for _ in range(10000)]
-        extra.append({"modo": mode, "comparación": f"{y} − minilm", "métrica": "ProtectedShare@20 (línea base)",
+        extra.append({"modo": mode, "comparación": f"{y} − {REF}", "métrica": "ProtectedShare@20 (línea base)",
                       "Δ": diff.mean(), "IC95_lo": np.percentile(boots, 2.5), "IC95_hi": np.percentile(boots, 97.5),
                       "p_Wilcoxon": wilcoxon(diff[diff != 0]).pvalue if (diff != 0).any() else 1.0})
 extra_tab = pd.DataFrame(extra).round(4)

@@ -1,5 +1,9 @@
-"""Intrinsic embedding statistics per model: anisotropy and co-author separation (AUC)."""
-import importlib, json, sys
+"""Intrinsic embedding statistics per model: anisotropy and co-author separation (AUC).
+
+Uso: python documentacion/comparativa-modelos/intrinsic_stats.py [--models minilm specter2 ...]
+Cada modelo usa su propio generador con semilla 42 (los mismos pares para todos los modelos).
+"""
+import argparse, importlib, json, sys
 from pathlib import Path
 import numpy as np, pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -7,7 +11,9 @@ exp = importlib.import_module("infrastructure.scripts.04_run_rerank_experiment")
 from infrastructure.db.csv_sources import load_clean_edges, primary_institutions
 
 P = exp.PROCESSED_DIR
-rng = np.random.default_rng(42)
+parser = argparse.ArgumentParser()
+parser.add_argument("--models", nargs="+", choices=list(exp.MODEL_IDS), default=list(exp.MODEL_IDS))
+MODELS = parser.parse_args().models
 groups = pd.read_csv(P / "ground_truth_groups.csv", dtype=str)
 pairs = groups[groups["size"] == "2"]["author_ids"].str.split("|")
 edges, survivors = load_clean_edges()
@@ -18,7 +24,8 @@ def auc(pos, neg):
     return (ranks[: len(pos)].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg))
 
 rows = []
-for alias in ("minilm", "specter2", "scincl"):
+for alias in MODELS:
+    rng = np.random.default_rng(42)
     e, m = exp.resolve_embedding_paths(alias)
     X, ids, _ = exp.load_embeddings(e, m)
     row = {a: i for i, a in enumerate(ids)}

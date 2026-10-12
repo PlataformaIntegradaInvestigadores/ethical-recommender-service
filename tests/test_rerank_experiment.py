@@ -42,6 +42,36 @@ class ArgParsingTests(unittest.TestCase):
             exp.parse_args(["--model", "bert"])
 
 
+class GeneralistAliasTests(unittest.TestCase):
+    def test_aliases_match_02_registry_ids(self):
+        self.assertEqual(exp.MODEL_IDS["minilm-l12"], "sentence-transformers/all-MiniLM-L12-v2")
+        self.assertEqual(exp.MODEL_IDS["mpnet"], "sentence-transformers/all-mpnet-base-v2")
+        for alias in ("minilm-l12", "mpnet"):
+            self.assertEqual(exp.parse_args(["--model", alias, "--leakage-free"]).model, alias)
+
+    def test_hyphenated_alias_paths_and_outputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            paths = write_artifacts(directory, "_minilm-l12")
+            self.assertEqual(exp.resolve_embedding_paths("minilm-l12", processed_dir=Path(directory)), paths)
+            self.assertEqual(paths[0].name, "author_embeddings_minilm-l12.npy")
+        self.assertEqual(exp.result_paths(Path("x"), "mpnet", "_leakage_free")["summary"].name,
+                         "rerank_summary_mpnet_leakage_free.csv")
+
+    def test_generalist_models_never_use_legacy_minilm_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            write_artifacts(directory, "")
+            with self.assertRaisesRegex(exp.ExperimentError, "--model minilm-l12"):
+                exp.resolve_embedding_paths("minilm-l12", processed_dir=Path(directory))
+
+    def test_encoder_spec_from_02_mapping_for_mpnet(self):
+        mapping = {"model_name": exp.MODEL_IDS["mpnet"], "model_alias": "mpnet", "token_pooling": "mean",
+                   "max_seq_length": 384, "input_format": "raw"}
+        spec = exp.encoder_spec("mpnet", mapping, 768)
+        self.assertEqual((spec.token_pooling, spec.max_seq_length, spec.input_format), ("mean", 384, "raw"))
+        with self.assertRaisesRegex(exp.ExperimentError, "no model metadata"):
+            exp.encoder_spec("minilm-l12", {"model_name": exp.MODEL_IDS["minilm-l12"]}, 384)
+
+
 class PathResolutionTests(unittest.TestCase):
     def test_suffixed_files_are_preferred(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -129,7 +159,7 @@ class OutputNamingTests(unittest.TestCase):
 
     def test_models_do_not_collide(self):
         names = {exp.result_paths(Path("x"), alias, "_t")["summary"] for alias in exp.MODEL_IDS}
-        self.assertEqual(len(names), 3)
+        self.assertEqual(len(names), len(exp.MODEL_IDS))
 
 
 class LeakageFreeEncodingTests(unittest.TestCase):
