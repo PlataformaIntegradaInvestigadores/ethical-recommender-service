@@ -57,6 +57,8 @@ Python incluido en Codex (pandas 3.0.1). Para reproducir esa ejecución aquí:
 .\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model minilm
 .\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model specter2
 .\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model scincl
+.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model minilm-l12
+.\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model mpnet
 # prueba rápida con 20 autores (añade _sample20 al nombre de los archivos)
 .\.venv\Scripts\python.exe infrastructure/scripts/02_generate_embeddings.py --model scincl --limit-authors 20
 ```
@@ -66,12 +68,18 @@ Python incluido en Codex (pandas 3.0.1). Para reproducir esa ejecución aquí:
 | `minilm` (defecto) | `sentence-transformers/all-MiniLM-L6-v2` | media de tokens | 256 | `título\nresumen` |
 | `specter2` | `allenai/specter2_base` | `[CLS]` | 512 | `título[SEP]resumen` |
 | `scincl` | `malteos/scincl` | `[CLS]` | 512 | `título[SEP]resumen` |
+| `minilm-l12` | `sentence-transformers/all-MiniLM-L12-v2` | media de tokens | 256 | `título\nresumen` |
+| `mpnet` | `sentence-transformers/all-mpnet-base-v2` | media de tokens | 384 | `título\nresumen` |
+
+Los modelos generalistas (`minilm`, `minilm-l12`, `mpnet`) usan el pooling de su configuración en
+Hugging Face. `all-MiniLM-L12-v2` trae `max_seq_length = 128` en su `sentence_bert_config.json`, pero
+su tarjeta indica 256; aquí se usa 256 para truncar igual que la línea base L6.
 
 Lee `data/processed/filtered_authors_profiles.csv` y genera, por modelo:
 
 - `data/processed/author_embeddings_<modelo>.npy`: matriz `float32` de forma
   `(n_autores, dim)` con filas normalizadas L2 (similitud coseno = producto punto).
-  `dim` es 384 para `minilm` y 768 para `specter2` y `scincl`.
+  `dim` es 384 para `minilm` y `minilm-l12`, y 768 para `specter2`, `scincl` y `mpnet`.
 - `data/processed/author_index_mapping_<modelo>.json`: `index_to_author_id[i]` es el
   `author_id` de la fila `i`, junto con modelo, dimensión, pooling, longitud máxima,
   dispositivo, GPU, versiones de torch/CUDA, fp16, batch size y tiempo transcurrido.

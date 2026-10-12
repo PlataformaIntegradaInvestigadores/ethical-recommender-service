@@ -216,7 +216,8 @@ class CliAndRegistryTests(unittest.TestCase):
         self.assertEqual(
             {alias: spec.hf_id for alias, spec in emb.MODEL_REGISTRY.items()},
             {"minilm": "sentence-transformers/all-MiniLM-L6-v2", "specter2": "allenai/specter2_base",
-             "scincl": "malteos/scincl"},
+             "scincl": "malteos/scincl", "minilm-l12": "sentence-transformers/all-MiniLM-L12-v2",
+             "mpnet": "sentence-transformers/all-mpnet-base-v2"},
         )
         for alias in ("specter2", "scincl"):
             spec = emb.MODEL_REGISTRY[alias]
@@ -225,6 +226,30 @@ class CliAndRegistryTests(unittest.TestCase):
         minilm = emb.MODEL_REGISTRY["minilm"]
         self.assertEqual((minilm.token_pooling, minilm.max_seq_length, minilm.input_format), ("mean", 256, "raw"))
         self.assertEqual(minilm.cuda_batch_size, 128)
+        expected = {"minilm-l12": (256, 128, 64), "mpnet": (384, 64, 32)}
+        for alias, (max_len, cuda_batch, cpu_batch) in expected.items():
+            spec = emb.MODEL_REGISTRY[alias]
+            self.assertEqual((spec.alias, spec.token_pooling, spec.input_format, spec.explicit_stack),
+                             (alias, "mean", "raw", False))
+            self.assertEqual((spec.max_seq_length, spec.cuda_batch_size, spec.cpu_batch_size),
+                             (max_len, cuda_batch, cpu_batch))
+
+    def test_generalist_aliases_parse_and_name_files(self):
+        for alias in ("minilm-l12", "mpnet"):
+            self.assertEqual(emb.parse_args(["--model", alias]).model, alias)
+        root = Path("out")
+        self.assertEqual(emb.output_paths("minilm-l12", root),
+                         (root / "author_embeddings_minilm-l12.npy", root / "author_index_mapping_minilm-l12.json"))
+        self.assertEqual(emb.output_paths("mpnet", root, limit_authors=20)[0], root / "author_embeddings_mpnet_sample20.npy")
+
+    def test_generalist_models_load_from_hub_config_with_registry_max_len(self):
+        st_cls = mock.MagicMock()
+        st_cls.return_value.get_embedding_dimension.return_value = 768
+        with mock.patch.object(emb, "_sentence_transformer_modules", return_value=(st_cls, mock.MagicMock(), mock.MagicMock())):
+            model = emb.load_model(emb.MODEL_REGISTRY["mpnet"], "cuda", fp16=True)
+        st_cls.assert_called_once_with("sentence-transformers/all-mpnet-base-v2", device="cuda")
+        self.assertEqual(model.max_seq_length, 384)
+        model.half.assert_called_once_with()
 
     def test_output_paths_are_model_specific(self):
         root = Path("out")
@@ -234,7 +259,7 @@ class CliAndRegistryTests(unittest.TestCase):
                          root / "author_embeddings_scincl_sample20.npy")
         self.assertEqual(emb.output_paths("minilm", root, legacy_names=True),
                          (root / "author_embeddings.npy", root / "author_index_mapping.json"))
-        self.assertEqual(len({emb.output_paths(alias)[0] for alias in emb.MODEL_REGISTRY}), 3)
+        self.assertEqual(len({emb.output_paths(alias)[0] for alias in emb.MODEL_REGISTRY}), len(emb.MODEL_REGISTRY))
 
     def test_main_passes_dynamic_paths_to_run(self):
         with mock.patch.object(emb, "run", return_value=0) as run:

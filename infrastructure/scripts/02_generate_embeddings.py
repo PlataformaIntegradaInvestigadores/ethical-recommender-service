@@ -5,6 +5,12 @@ Supports a comparative study of three encoders (see docs/execution_history.md):
 * ``minilm``   -> sentence-transformers/all-MiniLM-L6-v2 (general-purpose baseline, mean pooling, 256 tokens)
 * ``specter2`` -> allenai/specter2_base (scientific, citation-informed; CLS pooling, 512 tokens)
 * ``scincl``   -> malteos/scincl (scientific, citation-graph contrastive; CLS pooling, 512 tokens)
+* ``minilm-l12`` -> sentence-transformers/all-MiniLM-L12-v2 (general-purpose, 12 layers; mean pooling, 256 tokens)
+* ``mpnet``    -> sentence-transformers/all-mpnet-base-v2 (general-purpose; mean pooling, 384 tokens)
+
+The general-purpose models keep the ETL input 'title\nabstract' and the pooling of their hub config.
+all-MiniLM-L12-v2 ships ``max_seq_length=128`` in sentence_bert_config.json while its model card states
+256 word pieces; 256 is used here so it truncates like the L6 baseline.
 
 SPECTER2 and SciNCL follow their model cards: input ``title + tokenizer.sep_token + abstract``,
 truncation at 512 tokens and the first ([CLS]) token as document embedding. The official SPECTER2
@@ -85,6 +91,14 @@ MODEL_REGISTRY: Final[dict[str, ModelSpec]] = {
         alias="scincl", hf_id="malteos/scincl", token_pooling="cls",
         max_seq_length=512, input_format="title_sep_abstract", cuda_batch_size=32, cpu_batch_size=16,
         explicit_stack=True,
+    ),
+    "minilm-l12": ModelSpec(
+        alias="minilm-l12", hf_id="sentence-transformers/all-MiniLM-L12-v2", token_pooling="mean",
+        max_seq_length=256, input_format="raw", cuda_batch_size=128, cpu_batch_size=64, explicit_stack=False,
+    ),
+    "mpnet": ModelSpec(
+        alias="mpnet", hf_id="sentence-transformers/all-mpnet-base-v2", token_pooling="mean",
+        max_seq_length=384, input_format="raw", cuda_batch_size=64, cpu_batch_size=32, explicit_stack=False,
     ),
 }
 DEFAULT_MODEL_ALIAS: Final[str] = "minilm"
