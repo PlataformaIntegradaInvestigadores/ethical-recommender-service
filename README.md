@@ -157,3 +157,51 @@ longitud máxima y formato de entrada del mapping (`título[SEP]resumen` y `[CLS
 - `infrastructure/db/csv_sources.py`: afiliación principal, visibilidad (artículos y grado de coautoría).
 - Salidas en `data/processed/`: `ground_truth_groups.csv`, `loo_eval_split.csv`, `experiments/`.
 - Documentación: `documentacion/semanas-5-6-apriori-y-reranking.md`, `documentacion/resultados-apriori-reranking.md`.
+
+## Microservicio FastAPI (Fase 3)
+
+Capas (Clean Architecture):
+
+- `domain/entities/researcher.py`, `domain/repositories/author_repositories.py`: entidad y puertos.
+- `application/use_cases/recommend_collaborators.py`: caso de uso; reutiliza
+  `group_scoring` (centroide Average + K-NN), `fair_reranker` (R1: λ=0.8, tope 3 por
+  institución, cuota 20 % de baja visibilidad, umbral 0.5) y `ranking_metrics`.
+- `infrastructure/db/artifact_loaders.py`: carga `.npy`, mapeo y metadatos.
+- `infrastructure/api/`: `main.py` (app + lifespan), `settings.py`, `dependencies.py`,
+  `controllers/`, `v1/endpoints/recommend.py`; esquemas en `infrastructure/schemas/`.
+
+Ejecución local en Windows (PowerShell):
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+# Una sola vez: metadatos (nombre, institución principal, baja visibilidad)
+.\.venv\Scripts\python.exe -m infrastructure.scripts.05_export_author_metadata
+# Opcional: rutas distintas de data/processed
+$env:RECO_EMBEDDINGS_PATH = "D:\ruta\author_embeddings.npy"
+$env:RECO_MAPPING_PATH    = "D:\ruta\author_index_mapping.json"
+$env:RECO_METADATA_PATH   = "D:\ruta\author_metadata.csv"
+.\.venv\Scripts\python.exe -m uvicorn infrastructure.api.main:app --reload
+```
+
+Abrir http://127.0.0.1:8000/docs (Swagger UI). `GET /health` informa modelo y nº de autores.
+Sin `author_metadata.csv` el servicio usa los nombres de `filtered_authors_profiles.csv`
+e institución `UNKNOWN` (sin tope ni cuota efectiva).
+
+Ejemplo `POST /api/v1/recommend`:
+
+```json
+{
+  "author_ids": ["10040712400", "15842091200"],
+  "top_k": 20,
+  "k_candidates": 100,
+  "alpha": 1.0,
+  "fairness": {"enabled": true, "lambda": 0.8, "max_per_institution": 3,
+               "min_low_visibility_share": 0.2, "relevance_floor": 0.5, "mode": "prefix"}
+}
+```
+
+Respuestas: 200 con `team`, `recommendations` (rank, baseline_rank, relevance_score,
+final_score, institution, low_visibility, selection_reason), `fairness_metrics`
+(Gini-Simpson, exposición y proporción de baja visibilidad, NDKL, relevancia retenida),
+`diagnostics` y `parameters`; 404 si hay `author_ids` desconocidos; 422 si la lista está
+vacía o los parámetros son inválidos. Los miembros del equipo nunca se recomiendan.
