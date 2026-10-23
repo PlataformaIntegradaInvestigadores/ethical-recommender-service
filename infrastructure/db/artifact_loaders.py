@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from domain.entities.research_group import UNKNOWN_INSTITUTION
-from domain.entities.researcher import ResearcherProfile
+from domain.entities.researcher import AuthorSummary, ResearcherProfile
 
 METADATA_COLUMNS = ("author_id", "author_name", "institution", "low_visibility")
 
@@ -59,6 +59,7 @@ class CsvMetadataRepository:
 
     def __init__(self, metadata_path: Path | None = None, profiles_path: Path | None = None):
         self._profiles: dict[str, ResearcherProfile] = {}
+        self._article_counts: dict[str, int] = {}
         self.source = "none"
         if metadata_path and Path(metadata_path).is_file():
             frame = pd.read_csv(metadata_path, dtype={"author_id": str, "author_name": str, "institution": str})
@@ -70,14 +71,31 @@ class CsvMetadataRepository:
                 name = row.author_name if isinstance(row.author_name, str) else None
                 self._profiles[row.author_id] = ResearcherProfile(
                     row.author_id, name, inst, str(row.low_visibility).strip().lower() in {"true", "1"})
+            self._article_counts = _article_counts(frame)
             self.source = str(metadata_path)
         elif profiles_path and Path(profiles_path).is_file():
-            frame = pd.read_csv(profiles_path, dtype=str, usecols=["author_id", "author_name"])
-            self._profiles = {a: ResearcherProfile(a, n) for a, n in frame.itertuples(index=False)}
+            header = pd.read_csv(profiles_path, nrows=0).columns
+            cols = [c for c in ("author_id", "author_name", "article_count") if c in header]
+            frame = pd.read_csv(profiles_path, dtype=str, usecols=cols)
+            self._profiles = {a: ResearcherProfile(a, n if isinstance(n, str) else None)
+                              for a, n in zip(frame["author_id"], frame["author_name"])}
+            self._article_counts = _article_counts(frame)
             self.source = str(profiles_path)
 
     def get(self, author_id: str) -> ResearcherProfile:
         return self._profiles.get(author_id) or ResearcherProfile(author_id)
 
+    def summaries(self) -> list[AuthorSummary]:
+        return [AuthorSummary(p.author_id, p.name, p.institution, p.low_visibility,
+                              self._article_counts.get(p.author_id)) for p in self._profiles.values()]
+
     def __len__(self) -> int:
         return len(self._profiles)
+
+
+def _article_counts(frame: pd.DataFrame) -> dict[str, int]:
+    """``article_count`` column as ints (missing column or non-numeric values are skipped)."""
+    if "article_count" not in frame.columns:
+        return {}
+    counts = pd.to_numeric(frame["article_count"], errors="coerce")
+    return {a: int(c) for a, c in zip(frame["author_id"], counts) if pd.notna(c)}
