@@ -26,3 +26,4 @@ class AuthorSummary:
     institution: str = UNKNOWN_INSTITUTION
     low_visibility: bool = False
     article_count: int | None = None
+    full_name: str | None = None  # "Apellido, Nombre" from Scopus first/last name; None when unknown

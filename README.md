@@ -201,17 +201,29 @@ e institución `UNKNOWN` (sin tope ni cuota efectiva).
 Búsqueda de autores (autocompletado del equipo a-priori):
 
 ```
-GET /api/v1/authors?q=carrion&limit=10
-GET /api/v1/authors?q=10040712400        # ID Scopus exacto
+GET /api/v1/authors?q=pablo piedrahita&limit=10   # nombre y apellido, en cualquier orden
+GET /api/v1/authors?q=Piedrahita P.               # formato Scopus
+GET /api/v1/authors?q=10040712400                 # ID Scopus exacto
 ```
 
-Devuelve `{query, count, results: [{author_id, name, institution, low_visibility, article_count}]}`.
-La búsqueda ignora mayúsculas, tildes y puntuación (`carrion` encuentra `Carrión V.`); todas las
-palabras de la consulta deben aparecer en el nombre. Orden: nombre exacto, prefijo, palabra que
-empieza por la consulta, subcadena; luego más publicaciones primero. Solo devuelve autores con
-fila en la matriz de embeddings, de modo que cualquier resultado se puede enviar a
-`/api/v1/recommend`. `limit` va de 1 a 50 (defecto 10); una consulta con menos de 2 letras o
-dígitos responde 422.
+Devuelve `{query, count, results: [{author_id, name, institution, low_visibility, article_count,
+full_name}]}`. `name` es el nombre Scopus (`Piedrahita P.`) y `full_name` el nombre completo
+`Apellido, Nombre` (`Piedrahita, Paolo`) o `null` si no se conoce.
+
+Búsqueda flexible: se normaliza el texto (minúsculas, sin tildes ni puntuación) y cada palabra
+de la consulta debe coincidir con una palabra distinta del nombre Scopus o del nombre completo,
+en cualquier orden: palabra exacta, prefijo (`piedra`), un error de tipeo en palabras de 4+
+letras (`pablo` ~ `paolo`), inicial (`pablo` ~ `P.`) o subcadena. Con dos o más palabras al
+menos una debe coincidir con un apellido, para que `Pablo Piedrahita` no devuelva a otro
+"Pablo" por la inicial `P.`. Orden: mayor puntaje de coincidencia, apellido encontrado, nombre
+exacto o prefijo, más publicaciones. Solo devuelve autores con fila en la matriz de embeddings,
+de modo que cualquier resultado se puede enviar a `/api/v1/recommend`. `limit` va de 1 a 50
+(defecto 10); una consulta con menos de 2 letras o dígitos responde 422.
+
+`full_name` sale de la columna `full_name` de `author_metadata.csv` (script 05, desde
+`first_name`/`last_name` de `data/raw/authors.csv`). Si el CSV de metadatos es anterior y no la
+trae, el servicio lee `data/raw/authors.csv` (`RECO_AUTHORS_PATH`) al arrancar; sin ninguno de
+los dos la búsqueda sigue funcionando sobre el nombre Scopus (iniciales).
 
 Ejemplo `POST /api/v1/recommend`:
 

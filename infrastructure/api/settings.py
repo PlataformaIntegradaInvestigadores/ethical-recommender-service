@@ -8,6 +8,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROCESSED = PROJECT_ROOT / "data" / "processed"
+RAW = PROJECT_ROOT / "data" / "raw"
 # Angular dev server (centinela-front, ``ng serve``). Override with RECO_CORS_ORIGINS="a,b"; "" disables CORS.
 DEFAULT_CORS_ORIGINS = ("http://localhost:4200", "http://127.0.0.1:4200")
 
@@ -24,6 +25,8 @@ class Settings:
     metadata_path: Path
     profiles_path: Path
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
+    # Scopus authors.csv: full names for the search when author_metadata.csv lacks ``full_name``.
+    authors_path: Path | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -33,6 +36,7 @@ class Settings:
             metadata_path=_path("RECO_METADATA_PATH", PROCESSED / "author_metadata.csv"),
             profiles_path=_path("RECO_PROFILES_PATH", PROCESSED / "filtered_authors_profiles.csv"),
             cors_origins=_origins(os.environ.get("RECO_CORS_ORIGINS")),
+            authors_path=_path("RECO_AUTHORS_PATH", RAW / "authors.csv"),
         )
 
 

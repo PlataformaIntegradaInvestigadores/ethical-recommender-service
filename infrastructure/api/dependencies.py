@@ -24,7 +24,7 @@ class Container:
 
 def build_container(settings: Settings) -> Container:
     embeddings = NpyEmbeddingRepository(settings.embeddings_path, settings.mapping_path)
-    metadata = CsvMetadataRepository(settings.metadata_path, settings.profiles_path)
+    metadata = CsvMetadataRepository(settings.metadata_path, settings.profiles_path, settings.authors_path)
     return Container(embeddings, metadata, RecommendController(RecommendCollaborators(embeddings, metadata)),
                      AuthorController(SearchAuthors(embeddings, metadata)))
 

@@ -11,6 +11,7 @@ class AuthorOut(BaseModel):
     institution: str
     low_visibility: bool
     article_count: int | None = None
+    full_name: str | None = Field(None, description="Nombre completo 'Apellido, Nombre' (si se conoce)")
 
 
 class AuthorSearchResponse(BaseModel):
@@ -19,6 +20,7 @@ class AuthorSearchResponse(BaseModel):
     results: list[AuthorOut]
 
     model_config = {"json_schema_extra": {"examples": [{
-        "query": "carrion", "count": 1,
-        "results": [{"author_id": "10040712400", "name": "Carrion V.", "institution": "parque nacional galápagos",
-                     "low_visibility": False, "article_count": 13}]}]}}
+        "query": "pablo piedrahita", "count": 1,
+        "results": [{"author_id": "37026882700", "name": "Piedrahita P.",
+                     "institution": "escuela superior politecnica del litoral ecuador",
+                     "low_visibility": False, "article_count": 16, "full_name": "Piedrahita, Paolo"}]}]}}

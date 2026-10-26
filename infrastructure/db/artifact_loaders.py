@@ -12,6 +12,7 @@ from domain.entities.research_group import UNKNOWN_INSTITUTION
 from domain.entities.researcher import AuthorSummary, ResearcherProfile
 
 METADATA_COLUMNS = ("author_id", "author_name", "institution", "low_visibility")
+RAW_AUTHOR_COLUMNS = ("identifier", "first_name", "last_name")  # Scopus authors.csv
 
 
 class ArtifactLoadError(RuntimeError):
@@ -54,12 +55,27 @@ class NpyEmbeddingRepository:
         return self._rows.get(author_id)
 
 
-class CsvMetadataRepository:
-    """``author_metadata.csv`` (05_export_author_metadata.py); falls back to names from the ETL profiles."""
+def compose_full_name(first_name: object, last_name: object) -> str | None:
+    """``"Apellido, Nombre"`` from Scopus ``last_name``/``first_name``; ``None`` without a last name."""
+    last = last_name.strip() if isinstance(last_name, str) else ""
+    first = first_name.strip() if isinstance(first_name, str) else ""
+    if not last:
+        return None
+    return f"{last}, {first}" if first else last
 
-    def __init__(self, metadata_path: Path | None = None, profiles_path: Path | None = None):
+
+class CsvMetadataRepository:
+    """``author_metadata.csv`` (05_export_author_metadata.py); falls back to names from the ETL profiles.
+
+    Full names come from the optional ``full_name`` column of the metadata; if it is absent (metadata
+    exported before that column existed) they are read from the raw Scopus ``authors.csv`` when given.
+    """
+
+    def __init__(self, metadata_path: Path | None = None, profiles_path: Path | None = None,
+                 authors_path: Path | None = None):
         self._profiles: dict[str, ResearcherProfile] = {}
         self._article_counts: dict[str, int] = {}
+        self._full_names: dict[str, str] = {}
         self.source = "none"
         if metadata_path and Path(metadata_path).is_file():
             frame = pd.read_csv(metadata_path, dtype={"author_id": str, "author_name": str, "institution": str})
@@ -72,6 +88,9 @@ class CsvMetadataRepository:
                 self._profiles[row.author_id] = ResearcherProfile(
                     row.author_id, name, inst, str(row.low_visibility).strip().lower() in {"true", "1"})
             self._article_counts = _article_counts(frame)
+            if "full_name" in frame.columns:
+                self._full_names = {a: n.strip() for a, n in zip(frame["author_id"], frame["full_name"])
+                                    if isinstance(n, str) and n.strip()}
             self.source = str(metadata_path)
         elif profiles_path and Path(profiles_path).is_file():
             header = pd.read_csv(profiles_path, nrows=0).columns
@@ -81,13 +100,19 @@ class CsvMetadataRepository:
                               for a, n in zip(frame["author_id"], frame["author_name"])}
             self._article_counts = _article_counts(frame)
             self.source = str(profiles_path)
+        if not self._full_names and authors_path and Path(authors_path).is_file():
+            self._full_names = read_full_names(Path(authors_path), set(self._profiles))
 
     def get(self, author_id: str) -> ResearcherProfile:
         return self._profiles.get(author_id) or ResearcherProfile(author_id)
 
     def summaries(self) -> list[AuthorSummary]:
         return [AuthorSummary(p.author_id, p.name, p.institution, p.low_visibility,
-                              self._article_counts.get(p.author_id)) for p in self._profiles.values()]
+                              self._article_counts.get(p.author_id), self._full_names.get(p.author_id))
+                for p in self._profiles.values()]
+
+    def full_name(self, author_id: str) -> str | None:
+        return self._full_names.get(author_id)
 
     def __len__(self) -> int:
         return len(self._profiles)
@@ -99,3 +124,18 @@ def _article_counts(frame: pd.DataFrame) -> dict[str, int]:
         return {}
     counts = pd.to_numeric(frame["article_count"], errors="coerce")
     return {a: int(c) for a, c in zip(frame["author_id"], counts) if pd.notna(c)}
+
+
+def read_full_names(authors_path: Path, wanted: set[str] | None = None) -> dict[str, str]:
+    """``"Apellido, Nombre"`` per id from Scopus ``authors.csv`` (only ``wanted`` ids when given);
+    empty if the first/last name columns are missing."""
+    header = pd.read_csv(authors_path, nrows=0).columns
+    if not set(RAW_AUTHOR_COLUMNS) <= set(header):
+        return {}
+    frame = pd.read_csv(authors_path, dtype=str, usecols=list(RAW_AUTHOR_COLUMNS))
+    if wanted is not None:
+        frame = frame[frame["identifier"].isin(wanted)]
+    frame = frame.drop_duplicates("identifier")
+    names = {a: compose_full_name(f, l) for a, f, l in zip(frame["identifier"], frame["first_name"],
+                                                           frame["last_name"])}
+    return {a: n for a, n in names.items() if n}
