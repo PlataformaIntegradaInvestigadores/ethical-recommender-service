@@ -1,0 +1,37 @@
+services:
+  ethical-recommender-service:
+    build: .
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    ports:
+      - "127.0.0.1:${RECO_PORT:-8007}:${RECO_PORT:-8007}"
+    environment:
+      RECO_PORT: ${RECO_PORT:-8007}
+      RECO_CORS_ORIGINS: ${RECO_CORS_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}
+      RECO_EMBEDDINGS_PATH: /data/processed/author_embeddings.npy
+      RECO_MAPPING_PATH: /data/processed/author_index_mapping.json
+      RECO_METADATA_PATH: /data/processed/author_metadata.csv
+      RECO_PROFILES_PATH: /data/processed/filtered_authors_profiles.csv
+      RECO_AUTHORS_PATH: /data/raw/authors.csv
+    volumes:
+      - ${RECO_DATA_DIR:-./data}:/data:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['RECO_PORT'] + '/health', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      centinela-net:
+        aliases:
+          - ethical-recommender-service
+
+networks:
+  centinela-net:
+    external: true

@@ -1,0 +1,7 @@
+# Offline data pipeline only (embeddings, experiments). Not installed in the service image.
+# PyTorch with CUDA is installed separately (see README, "GPU / CUDA"):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu126
+-r requirements.txt
+sentence-transformers>=3.0
+torch>=2.4
+tqdm>=4.66

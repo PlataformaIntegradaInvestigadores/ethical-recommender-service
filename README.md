@@ -243,3 +243,16 @@ final_score, institution, low_visibility, selection_reason), `fairness_metrics`
 (Gini-Simpson, exposición y proporción de baja visibilidad, NDKL, relevancia retenida),
 `diagnostics` y `parameters`; 404 si hay `author_ids` desconocidos; 422 si la lista está
 vacía o los parámetros son inválidos. Los miembros del equipo nunca se recomiendan.
+
+## CI/CD y despliegue
+
+- `ci.yml`: en PR y en push a `develop` corre `ruff`, `black --check`, `pytest` (cobertura >= 90 %),
+  `docker compose config` y `docker build`. En push a `develop` despliega a staging (`ticcd`) con health
+  check y rollback automatico. `cd-production.yml` hace lo mismo desde `main` hacia produccion (`ticcp`).
+- Dependencias: `requirements.txt` (runtime del servicio), `requirements-dev.txt` (CI) y
+  `requirements-offline.txt` (pipeline de embeddings, no entra en la imagen).
+- Contenedor: puerto `8007`, expuesto solo en `127.0.0.1`, red `centinela-net`, alias
+  `ethical-recommender-service`. Los artefactos se montan en solo lectura desde `RECO_DATA_DIR`
+  (por defecto `./data`, con `processed/` y `raw/authors.csv`); no viajan en Git ni en la imagen.
+- Antes del primer despliegue en cada servidor: clonar el repo en `/opt/centinela/ethical-recommender-service`,
+  crear `.env` (ver `.env.example`) y copiar los artefactos a `data/processed/`.
