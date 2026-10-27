@@ -27,8 +27,9 @@ from domain.entities.researcher import ResearcherProfile
 from domain.repositories.author_repositories import AuthorEmbeddingRepository, AuthorMetadataRepository
 
 # Same values as SETTINGS["R1_suave"] in infrastructure/scripts/04_run_rerank_experiment.py.
-R1_CONFIG = RerankConfig(lambda_=0.8, max_per_institution=3, min_protected_share=0.2,
-                         relevance_floor=0.5, fairness_mode="prefix")
+R1_CONFIG = RerankConfig(
+    lambda_=0.8, max_per_institution=3, min_protected_share=0.2, relevance_floor=0.5, fairness_mode="prefix"
+)
 
 
 class RecommendationError(ValueError):
@@ -96,20 +97,35 @@ class RecommendCollaborators:
         top = retrieve_top_n(scores, member_rows, query.k_candidates)
         ids = self._embeddings.author_ids
         profiles = {ids[r]: self._metadata.get(ids[r]) for r, _ in top}
-        candidates = [Candidate(ids[r], s, profiles[ids[r]].institution, profiles[ids[r]].low_visibility)
-                      for r, s in top]
+        candidates = [
+            Candidate(ids[r], s, profiles[ids[r]].institution, profiles[ids[r]].low_visibility) for r, s in top
+        ]
         baseline_rank = {c.author_id: i + 1 for i, c in enumerate(candidates)}
         team = [self._metadata.get(a) for a in team_ids]
-        config = query.rerank_config if query.apply_fairness else replace(
-            query.rerank_config, lambda_=1.0, max_per_institution=None, fairness_mode="none")
+        config = (
+            query.rerank_config
+            if query.apply_fairness
+            else replace(query.rerank_config, lambda_=1.0, max_per_institution=None, fairness_mode="none")
+        )
         result = rerank(candidates, query.top_k, config, [p.institution for p in team]) if candidates else None
 
-        items = [] if result is None else [
-            RecommendedResearcher(profiles[it.candidate.author_id], it.position, it.candidate.relevance,
-                                  it.relevance_norm, it.institution_novelty, it.final_score, it.reason,
-                                  baseline_rank[it.candidate.author_id])
-            for it in result.items
-        ]
+        items = (
+            []
+            if result is None
+            else [
+                RecommendedResearcher(
+                    profiles[it.candidate.author_id],
+                    it.position,
+                    it.candidate.relevance,
+                    it.relevance_norm,
+                    it.institution_novelty,
+                    it.final_score,
+                    it.reason,
+                    baseline_rank[it.candidate.author_id],
+                )
+                for it in result.items
+            ]
+        )
         ranked = [i.profile.author_id for i in items]
         k = len(ranked)
         metrics: dict[str, float] = {}
@@ -127,11 +143,14 @@ class RecommendCollaborators:
                 "pool_low_visibility_share": pool_share,
                 "ndkl": rm.ndkl(ranked, protected, k, pool_share),
                 "relevance_retained": rm.relevance_retained(
-                    ranked, [c.author_id for c in candidates[:k]], {c.author_id: c.relevance for c in candidates}, k),
+                    ranked, [c.author_id for c in candidates[:k]], {c.author_id: c.relevance for c in candidates}, k
+                ),
             }
             metrics = {key: round(float(v), 6) for key, v in metrics.items()}
-        diagnostics = {"candidates_retrieved": len(candidates),
-                       "quota_picks": sum(i.reason == "quota" for i in items),
-                       "quota_shortfalls": result.quota_shortfalls if result else 0,
-                       "cap_relaxations": result.cap_relaxations if result else 0}
+        diagnostics = {
+            "candidates_retrieved": len(candidates),
+            "quota_picks": sum(i.reason == "quota" for i in items),
+            "quota_shortfalls": result.quota_shortfalls if result else 0,
+            "cap_relaxations": result.cap_relaxations if result else 0,
+        }
         return RecommendationResult(self._embeddings.model_name, team, items, metrics, diagnostics, config)

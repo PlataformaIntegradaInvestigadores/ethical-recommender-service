@@ -26,10 +26,11 @@ import logging
 import os
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import numpy as np
 import numpy.typing as npt
@@ -50,9 +51,7 @@ TITLE_SEPARATOR: Final[str] = "\n"
 POOLING_STRATEGY: Final[str] = "mean_of_l2_normalized_article_embeddings"
 AUTHOR_ID_COL: Final[str] = "author_id"
 PROFILE_TEXT_COL: Final[str] = "concatenated_profile_text"
-CUDA_INSTALL_HINT: Final[str] = (
-    "pip install torch --index-url https://download.pytorch.org/whl/cu126 (see README)"
-)
+CUDA_INSTALL_HINT: Final[str] = "pip install torch --index-url https://download.pytorch.org/whl/cu126 (see README)"
 
 FloatMatrix = npt.NDArray[np.float32]
 IndexArray = npt.NDArray[np.int64]
@@ -79,26 +78,54 @@ class ModelSpec:
 
 MODEL_REGISTRY: Final[dict[str, ModelSpec]] = {
     "minilm": ModelSpec(
-        alias="minilm", hf_id="sentence-transformers/all-MiniLM-L6-v2", token_pooling="mean",
-        max_seq_length=256, input_format="raw", cuda_batch_size=128, cpu_batch_size=64, explicit_stack=False,
+        alias="minilm",
+        hf_id="sentence-transformers/all-MiniLM-L6-v2",
+        token_pooling="mean",
+        max_seq_length=256,
+        input_format="raw",
+        cuda_batch_size=128,
+        cpu_batch_size=64,
+        explicit_stack=False,
     ),
     "specter2": ModelSpec(
-        alias="specter2", hf_id="allenai/specter2_base", token_pooling="cls",
-        max_seq_length=512, input_format="title_sep_abstract", cuda_batch_size=32, cpu_batch_size=16,
+        alias="specter2",
+        hf_id="allenai/specter2_base",
+        token_pooling="cls",
+        max_seq_length=512,
+        input_format="title_sep_abstract",
+        cuda_batch_size=32,
+        cpu_batch_size=16,
         explicit_stack=True,
     ),
     "scincl": ModelSpec(
-        alias="scincl", hf_id="malteos/scincl", token_pooling="cls",
-        max_seq_length=512, input_format="title_sep_abstract", cuda_batch_size=32, cpu_batch_size=16,
+        alias="scincl",
+        hf_id="malteos/scincl",
+        token_pooling="cls",
+        max_seq_length=512,
+        input_format="title_sep_abstract",
+        cuda_batch_size=32,
+        cpu_batch_size=16,
         explicit_stack=True,
     ),
     "minilm-l12": ModelSpec(
-        alias="minilm-l12", hf_id="sentence-transformers/all-MiniLM-L12-v2", token_pooling="mean",
-        max_seq_length=256, input_format="raw", cuda_batch_size=128, cpu_batch_size=64, explicit_stack=False,
+        alias="minilm-l12",
+        hf_id="sentence-transformers/all-MiniLM-L12-v2",
+        token_pooling="mean",
+        max_seq_length=256,
+        input_format="raw",
+        cuda_batch_size=128,
+        cpu_batch_size=64,
+        explicit_stack=False,
     ),
     "mpnet": ModelSpec(
-        alias="mpnet", hf_id="sentence-transformers/all-mpnet-base-v2", token_pooling="mean",
-        max_seq_length=384, input_format="raw", cuda_batch_size=64, cpu_batch_size=32, explicit_stack=False,
+        alias="mpnet",
+        hf_id="sentence-transformers/all-mpnet-base-v2",
+        token_pooling="mean",
+        max_seq_length=384,
+        input_format="raw",
+        cuda_batch_size=64,
+        cpu_batch_size=32,
+        explicit_stack=False,
     ),
 }
 DEFAULT_MODEL_ALIAS: Final[str] = "minilm"
@@ -116,7 +143,10 @@ class DeviceInfo:
 
 
 def output_paths(
-    alias: str, output_dir: Path = PROCESSED_DIR, limit_authors: int | None = None, legacy_names: bool = False,
+    alias: str,
+    output_dir: Path = PROCESSED_DIR,
+    limit_authors: int | None = None,
+    legacy_names: bool = False,
 ) -> tuple[Path, Path]:
     """Return (embeddings, mapping) paths, named after the model so runs never overwrite each other."""
     if legacy_names:
@@ -128,9 +158,7 @@ def output_paths(
 def load_profiles(path: Path) -> pd.DataFrame:
     """Load author profiles, validate the schema, and drop authors without usable text."""
     if not path.is_file():
-        raise EmbeddingPipelineError(
-            f"Input file not found: {path}. Run 01_filter_and_merge_authors.py first."
-        )
+        raise EmbeddingPipelineError(f"Input file not found: {path}. Run 01_filter_and_merge_authors.py first.")
     try:
         frame = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8")
     except (OSError, pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as exc:
@@ -190,17 +218,25 @@ def resolve_device(requested: str) -> DeviceInfo:
             logger.warning(
                 "CUDA was not detected (torch %s, built with CUDA %s); falling back to CPU, which is much "
                 "slower. For an NVIDIA GPU install a CUDA build: %s",
-                torch.__version__, torch.version.cuda, CUDA_INSTALL_HINT,
+                torch.__version__,
+                torch.version.cuda,
+                CUDA_INSTALL_HINT,
             )
         return DeviceInfo(device="cpu", torch_version=str(torch.__version__))
     properties = torch.cuda.get_device_properties(0)
     info = DeviceInfo(
-        device="cuda", torch_version=str(torch.__version__), cuda_version=str(torch.version.cuda),
-        gpu_name=str(torch.cuda.get_device_name(0)), vram_gb=round(properties.total_memory / 1024**3, 2),
+        device="cuda",
+        torch_version=str(torch.__version__),
+        cuda_version=str(torch.version.cuda),
+        gpu_name=str(torch.cuda.get_device_name(0)),
+        vram_gb=round(properties.total_memory / 1024**3, 2),
     )
     logger.info(
         "Using CUDA GPU %s (%.2f GB VRAM), torch %s, CUDA %s",
-        info.gpu_name, info.vram_gb, info.torch_version, info.cuda_version,
+        info.gpu_name,
+        info.vram_gb,
+        info.torch_version,
+        info.cuda_version,
     )
     return info
 
@@ -237,8 +273,13 @@ def load_model(spec: ModelSpec, device: str, fp16: bool = False) -> SentenceTran
     except Exception as exc:
         raise EmbeddingPipelineError(f"Could not load model '{spec.hf_id}': {exc}") from exc
     logger.info(
-        "Loaded model %s on %s (dim=%s, max_seq_length=%s, pooling=%s, fp16=%s)", spec.hf_id, model.device,
-        embedding_dimension(model), model.max_seq_length, spec.token_pooling, fp16 and device == "cuda",
+        "Loaded model %s on %s (dim=%s, max_seq_length=%s, pooling=%s, fp16=%s)",
+        spec.hf_id,
+        model.device,
+        embedding_dimension(model),
+        model.max_seq_length,
+        spec.token_pooling,
+        fp16 and device == "cuda",
     )
     return model
 
@@ -282,7 +323,9 @@ def _empty_cuda_cache() -> None:
 
 
 def encode_with_oom_retry(
-    encode: Callable[[list[str], int], FloatMatrix], batch: list[str], batch_size: int,
+    encode: Callable[[list[str], int], FloatMatrix],
+    batch: list[str],
+    batch_size: int,
 ) -> tuple[FloatMatrix, int]:
     """Encode ``batch``; on CUDA OOM halve the batch size and retry. Returns vectors and the size that worked."""
     while True:
@@ -306,15 +349,19 @@ def encode_documents(model: SentenceTransformer, documents: list[str], batch_siz
 
     def encode(batch: list[str], size: int) -> FloatMatrix:
         return model.encode(
-            batch, batch_size=size, convert_to_numpy=True, normalize_embeddings=True, show_progress_bar=False,
+            batch,
+            batch_size=size,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+            show_progress_bar=False,
         )
 
     embeddings = np.empty((len(documents), dimension), dtype=np.float32)
     with tqdm(total=len(documents), desc="Encoding articles", unit="doc") as progress:
         for start in range(0, len(documents), ENCODE_CHUNK_SIZE):
-            batch = documents[start:start + ENCODE_CHUNK_SIZE]
+            batch = documents[start : start + ENCODE_CHUNK_SIZE]
             vectors, batch_size = encode_with_oom_retry(encode, batch, batch_size)
-            embeddings[start:start + len(batch)] = np.asarray(vectors, dtype=np.float32)
+            embeddings[start : start + len(batch)] = np.asarray(vectors, dtype=np.float32)
             progress.update(len(batch))
     return embeddings
 
@@ -324,7 +371,8 @@ def encode_unique_documents(model: SentenceTransformer, documents: list[str], ba
     positions: dict[str, int] = {}
     inverse = np.fromiter(
         (positions.setdefault(document, len(positions)) for document in documents),
-        dtype=np.int64, count=len(documents),
+        dtype=np.int64,
+        count=len(documents),
     )
     logger.info("Encoding %d unique texts out of %d article documents.", len(positions), len(documents))
     return encode_documents(model, list(positions), batch_size)[inverse]
@@ -365,7 +413,11 @@ def save_embeddings(embeddings: FloatMatrix, path: Path) -> None:
 
 
 def save_mapping(
-    author_ids: list[str], model_name: str, dimension: int, path: Path, metadata: dict[str, Any] | None = None,
+    author_ids: list[str],
+    model_name: str,
+    dimension: int,
+    path: Path,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Persist the row-index to author_id mapping with model and run metadata."""
     payload: dict[str, Any] = {
@@ -404,27 +456,52 @@ def _positive_int(value: str) -> int:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--model", choices=sorted(MODEL_REGISTRY), default=DEFAULT_MODEL_ALIAS,
-                        help="encoder alias (default: %(default)s)")
-    parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto",
-                        help="auto uses CUDA when available and warns otherwise (default: %(default)s)")
-    parser.add_argument("--batch-size", type=_positive_int, default=None,
-                        help="encoding batch size; default depends on model and device (halved on CUDA OOM)")
+    parser.add_argument(
+        "--model",
+        choices=sorted(MODEL_REGISTRY),
+        default=DEFAULT_MODEL_ALIAS,
+        help="encoder alias (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--device",
+        choices=("auto", "cuda", "cpu"),
+        default="auto",
+        help="auto uses CUDA when available and warns otherwise (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=_positive_int,
+        default=None,
+        help="encoding batch size; default depends on model and device (halved on CUDA OOM)",
+    )
     fp16 = parser.add_mutually_exclusive_group()
-    fp16.add_argument("--fp16", dest="fp16", action="store_true", default=None,
-                      help="half precision on CUDA (default on CUDA, ignored on CPU)")
+    fp16.add_argument(
+        "--fp16",
+        dest="fp16",
+        action="store_true",
+        default=None,
+        help="half precision on CUDA (default on CUDA, ignored on CPU)",
+    )
     fp16.add_argument("--no-fp16", dest="fp16", action="store_false", help="keep float32 weights on CUDA")
     parser.add_argument("--input", type=Path, default=INPUT_PATH, help="profiles CSV (default: %(default)s)")
     parser.add_argument("--output-dir", type=Path, default=PROCESSED_DIR, help="output directory")
-    parser.add_argument("--limit-authors", type=_positive_int, default=None,
-                        help="embed only the first N authors (smoke tests); adds _sampleN to file names")
-    parser.add_argument("--legacy-names", action="store_true",
-                        help="write author_embeddings.npy / author_index_mapping.json (pre-study names)")
+    parser.add_argument(
+        "--limit-authors",
+        type=_positive_int,
+        default=None,
+        help="embed only the first N authors (smoke tests); adds _sampleN to file names",
+    )
+    parser.add_argument(
+        "--legacy-names",
+        action="store_true",
+        help="write author_embeddings.npy / author_index_mapping.json (pre-study names)",
+    )
     return parser.parse_args(argv)
 
 
-def history_line(spec: ModelSpec, device: DeviceInfo, batch_size: int, fp16: bool,
-                 shape: tuple[int, ...], elapsed: float) -> str:
+def history_line(
+    spec: ModelSpec, device: DeviceInfo, batch_size: int, fp16: bool, shape: tuple[int, ...], elapsed: float
+) -> str:
     """Markdown table row ready to paste into docs/execution_history.md."""
     hardware = f"GPU {device.gpu_name} ({device.vram_gb} GB)" if device.device == "cuda" else "CPU"
     cuda = device.cuda_version or "-"
@@ -468,7 +545,9 @@ def run(
     sep_token = model_sep_token(model) if spec.input_format != "raw" else None
     model_inputs = [format_document(document, spec.input_format, sep_token) for document in documents]
     author_embeddings = pool_by_author(
-        encode_unique_documents(model, model_inputs, batch_size), owners, len(profiles),
+        encode_unique_documents(model, model_inputs, batch_size),
+        owners,
+        len(profiles),
     )
     elapsed = time.perf_counter() - started
     metadata = {
@@ -488,7 +567,9 @@ def run(
     save_embeddings(author_embeddings, embeddings_path)
     save_mapping(profiles[AUTHOR_ID_COL].tolist(), spec.hf_id, author_embeddings.shape[1], mapping_path, metadata)
     verify_outputs(embeddings_path, mapping_path)
-    print(f"Model:             {spec.alias} ({spec.hf_id}, pooling={spec.token_pooling}, max_len={spec.max_seq_length})")
+    print(
+        f"Model:             {spec.alias} ({spec.hf_id}, pooling={spec.token_pooling}, max_len={spec.max_seq_length})"
+    )
     print(f"Device:            {device_info.device}" + (f" ({device_info.gpu_name})" if device_info.gpu_name else ""))
     print(f"Authors embedded:  {author_embeddings.shape[0]:,}")
     print(f"Articles encoded:  {len(documents):,}")
@@ -512,8 +593,14 @@ def main(argv: list[str] | None = None) -> int:
     embeddings_path, mapping_path = output_paths(args.model, args.output_dir, args.limit_authors, args.legacy_names)
     try:
         return run(
-            args.model, args.batch_size, args.device, args.input, embeddings_path, mapping_path,
-            fp16=args.fp16, limit_authors=args.limit_authors,
+            args.model,
+            args.batch_size,
+            args.device,
+            args.input,
+            embeddings_path,
+            mapping_path,
+            fp16=args.fp16,
+            limit_authors=args.limit_authors,
         )
     except EmbeddingPipelineError as exc:
         logger.error("%s", exc)

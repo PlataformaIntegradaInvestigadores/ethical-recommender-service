@@ -19,8 +19,23 @@ class AuthorSearchResponse(BaseModel):
     count: int
     results: list[AuthorOut]
 
-    model_config = {"json_schema_extra": {"examples": [{
-        "query": "pablo piedrahita", "count": 1,
-        "results": [{"author_id": "37026882700", "name": "Piedrahita P.",
-                     "institution": "escuela superior politecnica del litoral ecuador",
-                     "low_visibility": False, "article_count": 16, "full_name": "Piedrahita, Paolo"}]}]}}
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "query": "pablo piedrahita",
+                    "count": 1,
+                    "results": [
+                        {
+                            "author_id": "37026882700",
+                            "name": "Piedrahita P.",
+                            "institution": "escuela superior politecnica del litoral ecuador",
+                            "low_visibility": False,
+                            "article_count": 16,
+                            "full_name": "Piedrahita, Paolo",
+                        }
+                    ],
+                }
+            ]
+        }
+    }

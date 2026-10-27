@@ -27,7 +27,10 @@ ARTICLE_ABSTRACT_COL: Final[str] = "abstract"
 EDGE_AUTHOR_COL: Final[str] = "author_id"
 EDGE_ARTICLE_COL: Final[str] = "article_id"
 OUTPUT_COLUMNS: Final[list[str]] = [
-    "author_id", "author_name", "article_count", "concatenated_profile_text",
+    "author_id",
+    "author_name",
+    "article_count",
+    "concatenated_profile_text",
 ]
 logger = logging.getLogger("etl.filter_and_merge_authors")
 
@@ -54,9 +57,7 @@ def read_csv(path: Path, required_columns: list[str], id_columns: list[str]) -> 
                 raise DataLoadError(f"Empty CSV file: {path}")
             missing = [column for column in required_columns if column not in headers]
             if missing:
-                raise DataLoadError(
-                    f"{path.name} is missing columns {missing}. Available columns: {headers}"
-                )
+                raise DataLoadError(f"{path.name} is missing columns {missing}. Available columns: {headers}")
             if len(set(headers)) != len(headers):
                 raise DataLoadError(f"{path.name} has duplicate column names")
             rows = []
@@ -67,8 +68,7 @@ def read_csv(path: Path, required_columns: list[str], id_columns: list[str]) -> 
                     row = next(csv.reader([row[0]], strict=True))
                 if len(row) != len(headers):
                     raise DataLoadError(
-                        f"{path.name}, line {reader.line_num}: expected {len(headers)} "
-                        f"fields, found {len(row)}"
+                        f"{path.name}, line {reader.line_num}: expected {len(headers)} " f"fields, found {len(row)}"
                     )
                 rows.append(row)
         frame = pd.DataFrame(rows, columns=headers, dtype=str)
@@ -82,14 +82,18 @@ def read_csv(path: Path, required_columns: list[str], id_columns: list[str]) -> 
 def load_sources() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Load authors, articles, and article-author edges from data/raw."""
     authors = read_csv(
-        RAW_DIR / AUTHORS_FILE, [AUTHOR_ID_COL, AUTHOR_NAME_COL], [AUTHOR_ID_COL],
+        RAW_DIR / AUTHORS_FILE,
+        [AUTHOR_ID_COL, AUTHOR_NAME_COL],
+        [AUTHOR_ID_COL],
     )
     articles = read_csv(
         RAW_DIR / ARTICLES_FILE,
-        [ARTICLE_ID_COL, ARTICLE_TITLE_COL, ARTICLE_ABSTRACT_COL], [ARTICLE_ID_COL],
+        [ARTICLE_ID_COL, ARTICLE_TITLE_COL, ARTICLE_ABSTRACT_COL],
+        [ARTICLE_ID_COL],
     )
     edges = read_csv(
-        RAW_DIR / EDGES_FILE, [EDGE_AUTHOR_COL, EDGE_ARTICLE_COL],
+        RAW_DIR / EDGES_FILE,
+        [EDGE_AUTHOR_COL, EDGE_ARTICLE_COL],
         [EDGE_AUTHOR_COL, EDGE_ARTICLE_COL],
     )
     return authors, articles, edges
@@ -99,10 +103,12 @@ def build_article_texts(articles: pd.DataFrame) -> pd.DataFrame:
     """Return one title-plus-abstract text per article."""
     title = articles[ARTICLE_TITLE_COL].fillna("").astype(str).str.strip()
     abstract = articles[ARTICLE_ABSTRACT_COL].fillna("").astype(str).str.strip()
-    texts = pd.DataFrame({
-        EDGE_ARTICLE_COL: articles[ARTICLE_ID_COL],
-        "article_text": (title + "\n" + abstract).str.strip(),
-    })
+    texts = pd.DataFrame(
+        {
+            EDGE_ARTICLE_COL: articles[ARTICLE_ID_COL],
+            "article_text": (title + "\n" + abstract).str.strip(),
+        }
+    )
     return texts.drop_duplicates(subset=EDGE_ARTICLE_COL)
 
 
@@ -136,11 +142,14 @@ def build_profiles(
     merged = merged[merged["article_text"] != ""].sort_values([EDGE_AUTHOR_COL, EDGE_ARTICLE_COL])
     profiles = (
         merged.groupby(EDGE_AUTHOR_COL)["article_text"]
-        .agg(ARTICLE_SEPARATOR.join).rename("concatenated_profile_text")
-        .reset_index().rename(columns={EDGE_AUTHOR_COL: "author_id"})
+        .agg(ARTICLE_SEPARATOR.join)
+        .rename("concatenated_profile_text")
+        .reset_index()
+        .rename(columns={EDGE_AUTHOR_COL: "author_id"})
     )
     names = (
-        authors[[AUTHOR_ID_COL, AUTHOR_NAME_COL]].drop_duplicates(subset=AUTHOR_ID_COL)
+        authors[[AUTHOR_ID_COL, AUTHOR_NAME_COL]]
+        .drop_duplicates(subset=AUTHOR_ID_COL)
         .rename(columns={AUTHOR_ID_COL: "author_id", AUTHOR_NAME_COL: "author_name"})
     )
     counts = surviving_counts.rename_axis("author_id").reset_index()
@@ -173,11 +182,12 @@ def run() -> int:
     edges = clean_edges(edges, authors, articles)
     surviving_counts = apply_quality_filter(count_articles_per_author(edges))
     surviving_edges = edges[edges[EDGE_AUTHOR_COL].isin(surviving_counts.index)]
-    surviving_articles = articles[
-        articles[ARTICLE_ID_COL].isin(surviving_edges[EDGE_ARTICLE_COL])
-    ]
+    surviving_articles = articles[articles[ARTICLE_ID_COL].isin(surviving_edges[EDGE_ARTICLE_COL])]
     profiles = build_profiles(
-        surviving_counts, surviving_edges, build_article_texts(surviving_articles), authors,
+        surviving_counts,
+        surviving_edges,
+        build_article_texts(surviving_articles),
+        authors,
     )
     export_profiles(profiles)
     print_statistics(authors[AUTHOR_ID_COL].nunique(), len(profiles))

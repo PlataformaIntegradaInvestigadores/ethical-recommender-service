@@ -5,13 +5,23 @@ import unittest
 from itertools import combinations
 
 from application.services.apriori_groups import (
-    AprioriConfig, AprioriConfigError, build_tidsets, generate_candidates, mine_frequent_itemsets, select_groups,
+    AprioriConfig,
+    AprioriConfigError,
+    build_tidsets,
+    generate_candidates,
+    mine_frequent_itemsets,
+    select_groups,
 )
 from application.services.evaluation_split import EvaluationSplitError, leave_one_out_cases, sample_cases
 
 TRANSACTIONS = {
-    "p1": ["a", "b", "c"], "p2": ["a", "b", "c"], "p3": ["a", "b", "c", "d"],
-    "p4": ["a", "b"], "p5": ["d", "e"], "p6": ["d", "e"], "p7": ["d", "e"],
+    "p1": ["a", "b", "c"],
+    "p2": ["a", "b", "c"],
+    "p3": ["a", "b", "c", "d"],
+    "p4": ["a", "b"],
+    "p5": ["d", "e"],
+    "p6": ["d", "e"],
+    "p7": ["d", "e"],
     "big": ["a", "b", "c", "d", "e", "x1", "x2"],
 }
 
@@ -70,7 +80,9 @@ class AprioriTests(unittest.TestCase):
         capped = mine_frequent_itemsets(TRANSACTIONS, AprioriConfig(min_support=3, max_k=2, max_authors_per_article=5))
         self.assertEqual(max(capped.levels), 2)
         self.assertEqual(capped.truncated_at_k, 2)
-        unbounded = mine_frequent_itemsets(TRANSACTIONS, AprioriConfig(min_support=3, max_k=None, max_authors_per_article=5))
+        unbounded = mine_frequent_itemsets(
+            TRANSACTIONS, AprioriConfig(min_support=3, max_k=None, max_authors_per_article=5)
+        )
         self.assertIsNone(unbounded.truncated_at_k)
 
     def test_invalid_configuration(self):

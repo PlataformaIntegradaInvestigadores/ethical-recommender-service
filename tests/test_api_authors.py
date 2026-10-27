@@ -12,7 +12,13 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 from application.use_cases.search_authors import (
-    AuthorSearchError, AuthorSearchQuery, SearchAuthors, normalize_text, within_one_edit, word_score)
+    AuthorSearchError,
+    AuthorSearchQuery,
+    SearchAuthors,
+    normalize_text,
+    within_one_edit,
+    word_score,
+)
 from domain.entities.researcher import AuthorSummary, ResearcherProfile
 from infrastructure.api.main import create_app
 from infrastructure.api.settings import Settings, _origins
@@ -33,38 +39,55 @@ AUTHORS = [  # (id, name, institution, low_visibility, article_count)
 ]
 NOT_EMBEDDED = ("99999999999", "Carrion Fantasma X.", "escuela politécnica nacional", False, 50)
 # Scopus authors.csv first/last names (raw source of full_name); Lavoie and Ortiz have none.
-RAW_NAMES = {"10040712400": ("Víctor", "Carrión"), "20000000001": ("María", "Carrion-Pérez"),
-             "20000000002": ("Juan", "Pérez Ortiz"), "37026882700": ("Paolo", "Piedrahita"),
-             "57222268863": ("Dalton", "Cadena-Piedrahita"), "24290235400": ("C.", "Luis Piedrahita"),
-             "20000000005": ("Pablo A.", "Quezada"), "20000000006": ("Clara P.", "Paz"),
-             "99999999999": ("Xavier", "Carrion Fantasma")}
+RAW_NAMES = {
+    "10040712400": ("Víctor", "Carrión"),
+    "20000000001": ("María", "Carrion-Pérez"),
+    "20000000002": ("Juan", "Pérez Ortiz"),
+    "37026882700": ("Paolo", "Piedrahita"),
+    "57222268863": ("Dalton", "Cadena-Piedrahita"),
+    "24290235400": ("C.", "Luis Piedrahita"),
+    "20000000005": ("Pablo A.", "Quezada"),
+    "20000000006": ("Clara P.", "Paz"),
+    "99999999999": ("Xavier", "Carrion Fantasma"),
+}
 
 
 def write_raw_authors(path: Path) -> None:
-    rows = [(a, f, l, "x", "x") for a, (f, l) in RAW_NAMES.items()] + [("15842091200", None, "Lavoie", "x", "x")]
-    pd.DataFrame(rows, columns=["identifier", "first_name", "last_name", "auth_name", "initials"]
-                 ).to_csv(path, index=False)
+    rows = [(a, first, last, "x", "x") for a, (first, last) in RAW_NAMES.items()] + [
+        ("15842091200", None, "Lavoie", "x", "x")
+    ]
+    pd.DataFrame(rows, columns=["identifier", "first_name", "last_name", "auth_name", "initials"]).to_csv(
+        path, index=False
+    )
 
 
-def write_fixture(root: Path, with_metadata: bool = True, cors: tuple[str, ...] | None = None,
-                  full_names: str = "column") -> Settings:
+def write_fixture(
+    root: Path, with_metadata: bool = True, cors: tuple[str, ...] | None = None, full_names: str = "column"
+) -> Settings:
     """``full_names``: "column" (metadata has full_name), "raw" (only authors.csv has them) or "none"."""
     ids = [a[0] for a in AUTHORS]
     matrix = np.eye(len(ids), 4, dtype=np.float32) + 0.1
     matrix /= np.linalg.norm(matrix, axis=1, keepdims=True)
     np.save(root / "emb.npy", matrix)
-    (root / "map.json").write_text(json.dumps({"model_name": "test/minilm", "index_to_author_id": ids}),
-                                   encoding="utf-8")
+    (root / "map.json").write_text(
+        json.dumps({"model_name": "test/minilm", "index_to_author_id": ids}), encoding="utf-8"
+    )
     rows = AUTHORS + [NOT_EMBEDDED]
-    meta_frame = pd.DataFrame(rows, columns=["author_id", "author_name", "institution", "low_visibility",
-                                             "article_count"])
+    meta_frame = pd.DataFrame(
+        rows, columns=["author_id", "author_name", "institution", "low_visibility", "article_count"]
+    )
     if full_names == "column":
         meta_frame["full_name"] = [compose_full_name(*RAW_NAMES[r[0]]) if r[0] in RAW_NAMES else None for r in rows]
     meta_frame.to_csv(root / "meta.csv", index=False)
     write_raw_authors(root / "authors.csv")
-    pd.DataFrame({"author_id": [r[0] for r in rows], "author_name": [r[1] for r in rows],
-                  "article_count": [r[4] for r in rows], "concatenated_profile_text": "x"}
-                 ).to_csv(root / "profiles.csv", index=False)
+    pd.DataFrame(
+        {
+            "author_id": [r[0] for r in rows],
+            "author_name": [r[1] for r in rows],
+            "article_count": [r[4] for r in rows],
+            "concatenated_profile_text": "x",
+        }
+    ).to_csv(root / "profiles.csv", index=False)
     meta = root / ("meta.csv" if with_metadata else "missing.csv")
     extra = {} if cors is None else {"cors_origins": cors}
     if full_names == "raw":
@@ -101,9 +124,17 @@ class AuthorsApiTest(unittest.TestCase):
         body = self.search("lavoie").json()
         self.assertEqual(body["count"], 1)
         self.assertEqual(body["query"], "lavoie")
-        self.assertEqual(body["results"][0], {"author_id": "15842091200", "name": "Lavoie C.",
-                                              "institution": "university of galapagos", "low_visibility": True,
-                                              "article_count": 4, "full_name": None})
+        self.assertEqual(
+            body["results"][0],
+            {
+                "author_id": "15842091200",
+                "name": "Lavoie C.",
+                "institution": "university of galapagos",
+                "low_visibility": True,
+                "article_count": 4,
+                "full_name": None,
+            },
+        )
         body = self.search("pablo piedrahita").json()
         self.assertEqual(body["results"][0]["full_name"], "Piedrahita, Paolo")
         self.assertEqual(body["results"][0]["name"], "Piedrahita P.")
@@ -166,13 +197,17 @@ class AuthorsApiTest(unittest.TestCase):
         self.assertEqual(r.json(), {"query": "zzzz", "count": 0, "results": []})
 
     def test_cors_preflight_default_origin(self):
-        r = self.client.options("/api/v1/recommend", headers={
-            "Origin": "http://localhost:4200", "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "content-type,authorization"})
+        r = self.client.options(
+            "/api/v1/recommend",
+            headers={
+                "Origin": "http://localhost:4200",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,authorization",
+            },
+        )
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["access-control-allow-origin"], "http://localhost:4200")
-        r = self.client.get(
-            "/api/v1/authors", params={"q": "lavoie"}, headers={"Origin": "http://127.0.0.1:4200"})
+        r = self.client.get("/api/v1/authors", params={"q": "lavoie"}, headers={"Origin": "http://127.0.0.1:4200"})
         self.assertEqual(r.headers["access-control-allow-origin"], "http://127.0.0.1:4200")
 
     def test_cors_rejects_other_origin(self):
@@ -188,8 +223,7 @@ class CorsSettingsTest(unittest.TestCase):
         self.assertEqual(_origins(""), ())
 
     def test_cors_disabled(self):
-        with tempfile.TemporaryDirectory() as tmp, \
-                TestClient(create_app(write_fixture(Path(tmp), cors=()))) as client:
+        with tempfile.TemporaryDirectory() as tmp, TestClient(create_app(write_fixture(Path(tmp), cors=()))) as client:
             r = client.get("/api/v1/authors", params={"q": "lavoie"}, headers={"Origin": "http://localhost:4200"})
             self.assertEqual(r.status_code, 200)
             self.assertNotIn("access-control-allow-origin", r.headers)
@@ -197,8 +231,10 @@ class CorsSettingsTest(unittest.TestCase):
 
 class FullNameSourcesTest(unittest.TestCase):
     def _first(self, full_names, q="pablo piedrahita"):
-        with tempfile.TemporaryDirectory() as tmp, \
-                TestClient(create_app(write_fixture(Path(tmp), full_names=full_names))) as client:
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            TestClient(create_app(write_fixture(Path(tmp), full_names=full_names))) as client,
+        ):
             return client.get("/api/v1/authors", params={"q": q}).json()["results"][0]
 
     def test_full_names_from_raw_authors_csv(self):
@@ -219,8 +255,10 @@ class FullNameSourcesTest(unittest.TestCase):
 
 class SearchFallbackTest(unittest.TestCase):
     def test_profiles_fallback_has_names_and_counts(self):
-        with tempfile.TemporaryDirectory() as tmp, \
-                TestClient(create_app(write_fixture(Path(tmp), with_metadata=False))) as client:
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            TestClient(create_app(write_fixture(Path(tmp), with_metadata=False))) as client,
+        ):
             body = client.get("/api/v1/authors", params={"q": "lavoie"}).json()
             self.assertEqual(body["results"][0]["institution"], "UNKNOWN")
             self.assertEqual(body["results"][0]["article_count"], 4)
@@ -261,9 +299,15 @@ class SearchAuthorsUseCaseTest(unittest.TestCase):
         self.assertEqual(word_score("pablo", "maria"), 0)
 
     def test_more_matching_tokens_rank_first(self):
-        uc = SearchAuthors(_Embeddings(["1", "2"]), _Metadata([
-            AuthorSummary("1", "Piedrahita P.", article_count=99),
-            AuthorSummary("2", "Piedrahita P.", article_count=1, full_name="Piedrahita, Pablo")]))
+        uc = SearchAuthors(
+            _Embeddings(["1", "2"]),
+            _Metadata(
+                [
+                    AuthorSummary("1", "Piedrahita P.", article_count=99),
+                    AuthorSummary("2", "Piedrahita P.", article_count=1, full_name="Piedrahita, Pablo"),
+                ]
+            ),
+        )
         self.assertEqual([a.author_id for a in uc.execute(AuthorSearchQuery("pablo piedrahita"))], ["2", "1"])
         self.assertEqual([a.author_id for a in uc.execute(AuthorSearchQuery("piedrahita"))], ["1", "2"])
 
@@ -278,8 +322,10 @@ class SearchAuthorsUseCaseTest(unittest.TestCase):
         self.assertEqual(uc.execute(AuthorSearchQuery("ana")), [AuthorSummary("1", "Ana B.")])
 
     def test_exact_name_first_and_validation(self):
-        uc = SearchAuthors(_Embeddings(["1", "2"]), _Metadata([
-            AuthorSummary("1", "Ana Bel", article_count=9), AuthorSummary("2", "Ana", article_count=1)]))
+        uc = SearchAuthors(
+            _Embeddings(["1", "2"]),
+            _Metadata([AuthorSummary("1", "Ana Bel", article_count=9), AuthorSummary("2", "Ana", article_count=1)]),
+        )
         self.assertEqual([a.author_id for a in uc.execute(AuthorSearchQuery("ana"))], ["2", "1"])
         with self.assertRaises(AuthorSearchError):
             uc.execute(AuthorSearchQuery("ana", limit=0))

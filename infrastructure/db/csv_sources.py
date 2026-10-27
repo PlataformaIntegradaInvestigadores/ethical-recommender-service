@@ -47,10 +47,12 @@ def load_clean_edges(raw_dir: Path = etl.RAW_DIR) -> tuple[pd.DataFrame, pd.Seri
     authors = etl.read_csv(raw_dir / etl.AUTHORS_FILE, [etl.AUTHOR_ID_COL, etl.AUTHOR_NAME_COL], [etl.AUTHOR_ID_COL])
     articles = etl.read_csv(
         raw_dir / etl.ARTICLES_FILE,
-        [etl.ARTICLE_ID_COL, etl.ARTICLE_TITLE_COL, etl.ARTICLE_ABSTRACT_COL], [etl.ARTICLE_ID_COL],
+        [etl.ARTICLE_ID_COL, etl.ARTICLE_TITLE_COL, etl.ARTICLE_ABSTRACT_COL],
+        [etl.ARTICLE_ID_COL],
     )
     edges = etl.read_csv(
-        raw_dir / etl.EDGES_FILE, [etl.EDGE_AUTHOR_COL, etl.EDGE_ARTICLE_COL],
+        raw_dir / etl.EDGES_FILE,
+        [etl.EDGE_AUTHOR_COL, etl.EDGE_ARTICLE_COL],
         [etl.EDGE_AUTHOR_COL, etl.EDGE_ARTICLE_COL],
     )
     edges = etl.clean_edges(edges, authors, articles)
@@ -76,13 +78,24 @@ def primary_institutions(
     ``articles_affiliations.csv``; ties fall back to the lexicographically
     smallest key. Authors without any affiliation get ``UNKNOWN``.
     """
-    affiliations = etl.read_csv(raw_dir / AFFILIATIONS_FILE, [AFFILIATION_ID_COL, AFFILIATION_NAME_COL], [AFFILIATION_ID_COL])
-    author_links = etl.read_csv(raw_dir / AUTHORS_AFFILIATIONS_FILE, [LINK_AUTHOR_COL, LINK_AFFILIATION_COL],
-                                [LINK_AUTHOR_COL, LINK_AFFILIATION_COL])
-    article_links = etl.read_csv(raw_dir / ARTICLES_AFFILIATIONS_FILE, [LINK_ARTICLE_COL, LINK_AFFILIATION_COL],
-                                 [LINK_ARTICLE_COL, LINK_AFFILIATION_COL])
-    names = dict(affiliations.drop_duplicates(AFFILIATION_ID_COL)[[AFFILIATION_ID_COL, AFFILIATION_NAME_COL]]
-                 .itertuples(index=False, name=None))
+    affiliations = etl.read_csv(
+        raw_dir / AFFILIATIONS_FILE, [AFFILIATION_ID_COL, AFFILIATION_NAME_COL], [AFFILIATION_ID_COL]
+    )
+    author_links = etl.read_csv(
+        raw_dir / AUTHORS_AFFILIATIONS_FILE,
+        [LINK_AUTHOR_COL, LINK_AFFILIATION_COL],
+        [LINK_AUTHOR_COL, LINK_AFFILIATION_COL],
+    )
+    article_links = etl.read_csv(
+        raw_dir / ARTICLES_AFFILIATIONS_FILE,
+        [LINK_ARTICLE_COL, LINK_AFFILIATION_COL],
+        [LINK_ARTICLE_COL, LINK_AFFILIATION_COL],
+    )
+    names = dict(
+        affiliations.drop_duplicates(AFFILIATION_ID_COL)[[AFFILIATION_ID_COL, AFFILIATION_NAME_COL]].itertuples(
+            index=False, name=None
+        )
+    )
 
     def key(affiliation_id: str) -> str:
         if not merge_by_name:
@@ -103,7 +116,10 @@ def primary_institutions(
     evidence = (
         author_articles.rename(columns={etl.EDGE_AUTHOR_COL: LINK_AUTHOR_COL, etl.EDGE_ARTICLE_COL: LINK_ARTICLE_COL})
         .merge(art_inst, on=LINK_ARTICLE_COL)
-        .groupby([LINK_AUTHOR_COL, "institution"]).size().rename("support").reset_index()
+        .groupby([LINK_AUTHOR_COL, "institution"])
+        .size()
+        .rename("support")
+        .reset_index()
     )
     scored = links.merge(evidence, on=[LINK_AUTHOR_COL, "institution"], how="left").fillna({"support": 0})
     scored = scored.sort_values([LINK_AUTHOR_COL, "support", "institution"], ascending=[True, False, True])
@@ -143,8 +159,9 @@ def visibility_table(
         pairs = pairs[sizes <= max_authors_per_article]
     joined = pairs.merge(pairs, on=etl.EDGE_ARTICLE_COL, suffixes=("", "_co"))
     joined = joined[joined[etl.EDGE_AUTHOR_COL] != joined[f"{etl.EDGE_AUTHOR_COL}_co"]]
-    degree = joined.drop_duplicates([etl.EDGE_AUTHOR_COL, f"{etl.EDGE_AUTHOR_COL}_co"]) \
-        .groupby(etl.EDGE_AUTHOR_COL).size()
+    degree = (
+        joined.drop_duplicates([etl.EDGE_AUTHOR_COL, f"{etl.EDGE_AUTHOR_COL}_co"]).groupby(etl.EDGE_AUTHOR_COL).size()
+    )
     vertex_count = edges[etl.EDGE_AUTHOR_COL].nunique()
     table = survivor_counts.rename("article_count").rename_axis("author_id").reset_index()
     table["coauthor_degree"] = table["author_id"].map(degree).fillna(0).astype(int)

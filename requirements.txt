@@ -1,11 +1,5 @@
-pandas>=2.0
-numpy>=1.26
-tqdm>=4.66
-sentence-transformers>=3.0
-# PyTorch se instala aparte para obtener la build con CUDA (ver README, "GPU / CUDA"):
-#   pip install torch --index-url https://download.pytorch.org/whl/cu126
-# Si se instala desde este archivo sin ese paso, pip trae la build de CPU en Windows.
-torch>=2.4
-fastapi>=0.110
-uvicorn[standard]>=0.29
-httpx>=0.27
+fastapi==0.142.2
+uvicorn==0.54.0
+pydantic==2.13.5
+numpy==2.4.4
+pandas==3.0.1

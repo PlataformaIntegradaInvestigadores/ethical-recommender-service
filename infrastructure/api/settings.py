@@ -29,7 +29,7 @@ class Settings:
     authors_path: Path | None = None
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         return cls(
             embeddings_path=_path("RECO_EMBEDDINGS_PATH", PROCESSED / "author_embeddings.npy"),
             mapping_path=_path("RECO_MAPPING_PATH", PROCESSED / "author_index_mapping.json"),

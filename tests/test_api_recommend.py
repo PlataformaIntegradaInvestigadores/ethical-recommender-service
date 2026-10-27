@@ -24,11 +24,17 @@ def write_fixture(root: Path) -> Settings:
     matrix /= np.linalg.norm(matrix, axis=1, keepdims=True)
     ids = [f"A{i:03d}" for i in range(N_AUTHORS)]
     np.save(root / "emb.npy", matrix)
-    (root / "map.json").write_text(json.dumps({"model_name": "test/minilm", "embedding_dim": DIM,
-                                               "index_to_author_id": ids}), encoding="utf-8")
-    pd.DataFrame({"author_id": ids, "author_name": [f"Author {i}" for i in range(N_AUTHORS)],
-                  "institution": [f"inst{i % 4}" if i % 7 else "UNKNOWN" for i in range(N_AUTHORS)],
-                  "low_visibility": [i % 3 == 0 for i in range(N_AUTHORS)]}).to_csv(root / "meta.csv", index=False)
+    (root / "map.json").write_text(
+        json.dumps({"model_name": "test/minilm", "embedding_dim": DIM, "index_to_author_id": ids}), encoding="utf-8"
+    )
+    pd.DataFrame(
+        {
+            "author_id": ids,
+            "author_name": [f"Author {i}" for i in range(N_AUTHORS)],
+            "institution": [f"inst{i % 4}" if i % 7 else "UNKNOWN" for i in range(N_AUTHORS)],
+            "low_visibility": [i % 3 == 0 for i in range(N_AUTHORS)],
+        }
+    ).to_csv(root / "meta.csv", index=False)
     return Settings(root / "emb.npy", root / "map.json", root / "meta.csv", root / "missing.csv")
 
 

@@ -191,9 +191,11 @@ def mine_frequent_itemsets(
 
     if config.level_limit >= 2 and level_one:
         level_started = time.perf_counter()
-        used_transactions = (set(items) for items in transactions.values()
-                             if config.max_authors_per_article is None
-                             or len(set(items)) <= config.max_authors_per_article)
+        used_transactions = (
+            set(items)
+            for items in transactions.values()
+            if config.max_authors_per_article is None or len(set(items)) <= config.max_authors_per_article
+        )
         level_two, candidate_count = _level_two(level_one, used_transactions, config.min_support)
         stats.append(LevelStats(2, candidate_count, 0, len(level_two), time.perf_counter() - level_started))
         levels[2] = level_two
@@ -250,7 +252,8 @@ def flag_maximal_and_closed(
                         non_closed.add(subset)
     groups = [
         FrequentGroup(itemset, tids, itemset not in non_maximal, itemset not in non_closed)
-        for k in sorted(levels) if k >= min_group_size
+        for k in sorted(levels)
+        if k >= min_group_size
         for itemset, tids in sorted(levels[k].items())
     ]
     return groups

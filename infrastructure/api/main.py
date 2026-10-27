@@ -1,7 +1,7 @@
 """FastAPI entry point.
 
-    uvicorn infrastructure.api.main:app --reload
-    python -m infrastructure.api.main
+uvicorn infrastructure.api.main:app --reload
+python -m infrastructure.api.main
 """
 
 from __future__ import annotations
@@ -27,20 +27,35 @@ def create_app(settings: Settings | None = None, container: Container | None = N
         app.state.container = container or build_container(settings)
         yield
 
-    app = FastAPI(title="Ethical Recommender Service", version="0.1.0", lifespan=lifespan,
-                  description="Recomendación ética de investigadores para Centinela V3")
+    app = FastAPI(
+        title="Ethical Recommender Service",
+        version="0.1.0",
+        lifespan=lifespan,
+        description="Recomendación ética de investigadores para Centinela V3",
+    )
     if settings.cors_origins:
         # Browser clients on another origin (centinela-front on :4200). With the ng-serve proxy
         # (/api/recommender -> :8000) requests are same-origin and CORS is not involved.
-        app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_credentials=False,
-                           allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"], max_age=600)
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.cors_origins),
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["*"],
+            max_age=600,
+        )
     app.include_router(recommend_router)
     app.include_router(authors_router)
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health(c: Container = Depends(get_container)) -> HealthResponse:
-        return HealthResponse(status="ok", model=c.embeddings.model_name, authors=len(c.embeddings.author_ids),
-                              embedding_dim=int(c.embeddings.matrix.shape[1]), metadata_source=c.metadata.source)
+        return HealthResponse(
+            status="ok",
+            model=c.embeddings.model_name,
+            authors=len(c.embeddings.author_ids),
+            embedding_dim=int(c.embeddings.matrix.shape[1]),
+            metadata_source=c.metadata.source,
+        )
 
     return app
 
@@ -50,5 +65,8 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("infrastructure.api.main:app", host=os.environ.get("RECO_HOST", "127.0.0.1"),
-                port=int(os.environ.get("RECO_PORT", "8000")))
+    uvicorn.run(
+        "infrastructure.api.main:app",
+        host=os.environ.get("RECO_HOST", "127.0.0.1"),
+        port=int(os.environ.get("RECO_PORT", "8000")),
+    )

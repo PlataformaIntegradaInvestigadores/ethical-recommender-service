@@ -1,0 +1,16 @@
+.git
+.venv
+venv
+__pycache__
+.pytest_cache
+.ruff_cache
+.env
+.env.*
+AGENTS.md
+CLAUDE.md
+tests
+data
+docs
+documentacion
+report.xml
+coverage.xml
