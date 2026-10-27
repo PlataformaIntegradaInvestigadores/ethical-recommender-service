@@ -143,7 +143,9 @@ def ndkl(ranked: Sequence[str], protected: Mapping[str, bool], k: int, target_sh
     return total / z
 
 
-def relevance_retained(reranked: Sequence[str], baseline: Sequence[str], relevance: Mapping[str, float], k: int) -> float:
+def relevance_retained(
+    reranked: Sequence[str], baseline: Sequence[str], relevance: Mapping[str, float], k: int
+) -> float:
     """sum relevance(reranked Top-K) / sum relevance(baseline Top-K); 1 - value is the relevance loss."""
     _check_k(k)
     base = sum(relevance[item] for item in baseline[:k])

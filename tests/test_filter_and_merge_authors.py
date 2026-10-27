@@ -45,15 +45,19 @@ class CsvTests(unittest.TestCase):
 class ProfileTests(unittest.TestCase):
     def setUp(self):
         self.authors = pd.DataFrame({"identifier": ["001", "002"], "auth_name": ["Ana", "Luis"]})
-        self.articles = pd.DataFrame({
-            "identifier": ["03", "01", "02", "02"],
-            "title": ["", " First ", "Second", "Duplicate"],
-            "abstract": ["", " Abstract ", "", "Ignored"],
-        })
-        self.edges = pd.DataFrame({
-            "author_id": ["001", "001", "001", "001", "001", "999", None, "002"],
-            "article_id": ["03", "02", "01", "01", "missing", "01", "01", "01"],
-        })
+        self.articles = pd.DataFrame(
+            {
+                "identifier": ["03", "01", "02", "02"],
+                "title": ["", " First ", "Second", "Duplicate"],
+                "abstract": ["", " Abstract ", "", "Ignored"],
+            }
+        )
+        self.edges = pd.DataFrame(
+            {
+                "author_id": ["001", "001", "001", "001", "001", "999", None, "002"],
+                "article_id": ["03", "02", "01", "01", "missing", "01", "01", "01"],
+            }
+        )
 
     def profiles(self, min_articles=3):
         edges = etl.clean_edges(self.edges, self.authors, self.articles)

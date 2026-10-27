@@ -1,10 +1,10 @@
 """CLI, embedding path resolution, validation and output naming of 04_run_rerank_experiment.py (no data, no models)."""
 
 import importlib
-import unittest.mock
 import json
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,8 +17,12 @@ def write_artifacts(directory, stem, rows=2, dim=3, ids=None, **mapping_fields):
     embeddings = Path(directory) / f"author_embeddings{stem}.npy"
     mapping = Path(directory) / f"author_index_mapping{stem}.json"
     np.save(embeddings, np.eye(rows, dim, dtype=np.float32))
-    payload = {"model_name": exp.MODEL_IDS["minilm"], "embedding_dim": dim,
-               "index_to_author_id": ids if ids is not None else [f"a{i}" for i in range(rows)], **mapping_fields}
+    payload = {
+        "model_name": exp.MODEL_IDS["minilm"],
+        "embedding_dim": dim,
+        "index_to_author_id": ids if ids is not None else [f"a{i}" for i in range(rows)],
+        **mapping_fields,
+    }
     mapping.write_text(json.dumps(payload), encoding="utf-8")
     return embeddings, mapping
 
@@ -26,15 +30,30 @@ def write_artifacts(directory, stem, rows=2, dim=3, ids=None, **mapping_fields):
 class ArgParsingTests(unittest.TestCase):
     def test_defaults(self):
         args = exp.parse_args([])
-        self.assertEqual((args.model, args.embeddings, args.mapping, args.tag, args.device),
-                         ("minilm", None, None, "", "auto"))
+        self.assertEqual(
+            (args.model, args.embeddings, args.mapping, args.tag, args.device), ("minilm", None, None, "", "auto")
+        )
         self.assertFalse(args.leakage_free)
 
     def test_model_and_overrides(self):
-        args = exp.parse_args(["--model", "scincl", "--embeddings", "e.npy", "--mapping", "m.json",
-                               "--leakage-free", "--tag", "_lf", "--device", "cpu"])
-        self.assertEqual((args.model, args.embeddings, args.mapping, args.tag), ("scincl", Path("e.npy"),
-                                                                                 Path("m.json"), "_lf"))
+        args = exp.parse_args(
+            [
+                "--model",
+                "scincl",
+                "--embeddings",
+                "e.npy",
+                "--mapping",
+                "m.json",
+                "--leakage-free",
+                "--tag",
+                "_lf",
+                "--device",
+                "cpu",
+            ]
+        )
+        self.assertEqual(
+            (args.model, args.embeddings, args.mapping, args.tag), ("scincl", Path("e.npy"), Path("m.json"), "_lf")
+        )
         self.assertTrue(args.leakage_free)
 
     def test_rejects_unknown_model(self):
@@ -54,8 +73,10 @@ class GeneralistAliasTests(unittest.TestCase):
             paths = write_artifacts(directory, "_minilm-l12")
             self.assertEqual(exp.resolve_embedding_paths("minilm-l12", processed_dir=Path(directory)), paths)
             self.assertEqual(paths[0].name, "author_embeddings_minilm-l12.npy")
-        self.assertEqual(exp.result_paths(Path("x"), "mpnet", "_leakage_free")["summary"].name,
-                         "rerank_summary_mpnet_leakage_free.csv")
+        self.assertEqual(
+            exp.result_paths(Path("x"), "mpnet", "_leakage_free")["summary"].name,
+            "rerank_summary_mpnet_leakage_free.csv",
+        )
 
     def test_generalist_models_never_use_legacy_minilm_files(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -64,8 +85,13 @@ class GeneralistAliasTests(unittest.TestCase):
                 exp.resolve_embedding_paths("minilm-l12", processed_dir=Path(directory))
 
     def test_encoder_spec_from_02_mapping_for_mpnet(self):
-        mapping = {"model_name": exp.MODEL_IDS["mpnet"], "model_alias": "mpnet", "token_pooling": "mean",
-                   "max_seq_length": 384, "input_format": "raw"}
+        mapping = {
+            "model_name": exp.MODEL_IDS["mpnet"],
+            "model_alias": "mpnet",
+            "token_pooling": "mean",
+            "max_seq_length": 384,
+            "input_format": "raw",
+        }
         spec = exp.encoder_spec("mpnet", mapping, 768)
         self.assertEqual((spec.token_pooling, spec.max_seq_length, spec.input_format), ("mean", 384, "raw"))
         with self.assertRaisesRegex(exp.ExperimentError, "no model metadata"):
@@ -131,11 +157,18 @@ class ValidationTests(unittest.TestCase):
                 exp.load_embeddings(*write_artifacts(directory, "_dup", ids=["a0", "a0"]))
 
     def test_encoder_spec_from_new_mapping(self):
-        mapping = {"model_name": "malteos/scincl", "model_alias": "scincl", "token_pooling": "cls",
-                   "max_seq_length": 512, "input_format": "title_sep_abstract"}
+        mapping = {
+            "model_name": "malteos/scincl",
+            "model_alias": "scincl",
+            "token_pooling": "cls",
+            "max_seq_length": 512,
+            "input_format": "title_sep_abstract",
+        }
         spec = exp.encoder_spec("scincl", mapping, 768)
-        self.assertEqual((spec.model_id, spec.token_pooling, spec.max_seq_length, spec.input_format, spec.dimension),
-                         ("malteos/scincl", "cls", 512, "title_sep_abstract", 768))
+        self.assertEqual(
+            (spec.model_id, spec.token_pooling, spec.max_seq_length, spec.input_format, spec.dimension),
+            ("malteos/scincl", "cls", 512, "title_sep_abstract", 768),
+        )
 
     def test_encoder_spec_legacy_minilm_defaults(self):
         spec = exp.encoder_spec("minilm", {"model_name": exp.MODEL_IDS["minilm"]}, 384)

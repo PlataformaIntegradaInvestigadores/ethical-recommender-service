@@ -175,7 +175,10 @@ def rerank(
         out = []
         for index in pool:
             novelty = institution_novelty(
-                candidates[index].institution, counts, query_insts, config.query_institution_penalty,
+                candidates[index].institution,
+                counts,
+                query_insts,
+                config.query_institution_penalty,
             )
             out.append((config.lambda_ * rel_norm[index] + (1.0 - config.lambda_) * novelty, novelty, index))
         return out
@@ -195,8 +198,7 @@ def rerank(
             open_pool, reason = list(remaining), "cap_relaxed"
             result.cap_relaxations += 1
         if protected_selected < required[position - 1]:
-            eligible = [i for i in open_pool
-                        if candidates[i].protected and rel_norm[i] >= config.relevance_floor]
+            eligible = [i for i in open_pool if candidates[i].protected and rel_norm[i] >= config.relevance_floor]
             if eligible:
                 open_pool, reason = eligible, "quota"
             else:

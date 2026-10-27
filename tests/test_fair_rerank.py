@@ -7,10 +7,18 @@ import numpy as np
 
 from application.services import ranking_metrics as rm
 from application.services.fair_reranker import (
-    RerankConfig, RerankConfigError, institution_novelty, normalize_relevance, required_protected_counts, rerank,
+    RerankConfig,
+    RerankConfigError,
+    institution_novelty,
+    normalize_relevance,
+    required_protected_counts,
+    rerank,
 )
 from application.services.group_scoring import (
-    GroupScoringError, aggregate_scores, retrieve_top_n, score_all_candidates,
+    GroupScoringError,
+    aggregate_scores,
+    retrieve_top_n,
+    score_all_candidates,
 )
 from domain.entities.ranking import Candidate
 from domain.entities.research_group import UNKNOWN_INSTITUTION
@@ -48,10 +56,18 @@ class GroupScoringTests(unittest.TestCase):
 
 def pool():
     # relevance descending; institution U dominates the head; p* are low-visibility
-    spec = [("c1", 1.00, "U", False), ("c2", 0.95, "U", False), ("c3", 0.90, "U", False),
-            ("c4", 0.85, "U", False), ("p1", 0.80, "V", True), ("c5", 0.75, "W", False),
-            ("p2", 0.70, UNKNOWN_INSTITUTION, True), ("c6", 0.60, "U", False), ("p3", 0.05, "X", True),
-            ("c7", 0.00, "Y", False)]
+    spec = [
+        ("c1", 1.00, "U", False),
+        ("c2", 0.95, "U", False),
+        ("c3", 0.90, "U", False),
+        ("c4", 0.85, "U", False),
+        ("p1", 0.80, "V", True),
+        ("c5", 0.75, "W", False),
+        ("p2", 0.70, UNKNOWN_INSTITUTION, True),
+        ("c6", 0.60, "U", False),
+        ("p3", 0.05, "X", True),
+        ("c7", 0.00, "Y", False),
+    ]
     return [Candidate(*row) for row in spec]
 
 
@@ -66,7 +82,9 @@ class RerankTests(unittest.TestCase):
         self.assertEqual(ids, ["c1", "c2", "p1", "c5", "p2", "p3"])
         novelty = institution_novelty("U", __import__("collections").Counter({"U": 1}), frozenset({"U"}))
         self.assertAlmostEqual(novelty, 1 / 3)
-        self.assertEqual(institution_novelty(UNKNOWN_INSTITUTION, __import__("collections").Counter(), frozenset()), 0.0)
+        self.assertEqual(
+            institution_novelty(UNKNOWN_INSTITUTION, __import__("collections").Counter(), frozenset()), 0.0
+        )
 
     def test_prefix_quota_respects_relevance_floor(self):
         config = RerankConfig(lambda_=1.0, max_per_institution=None, min_protected_share=0.5, relevance_floor=0.5)

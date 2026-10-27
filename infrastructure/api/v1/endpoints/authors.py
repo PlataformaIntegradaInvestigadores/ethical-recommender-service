@@ -12,11 +12,15 @@ from infrastructure.schemas.authors import AuthorSearchResponse
 router = APIRouter(prefix="/api/v1", tags=["authors"])
 
 
-@router.get("/authors", response_model=AuthorSearchResponse,
-            responses={422: {"description": "consulta demasiado corta o parámetros inválidos"}})
+@router.get(
+    "/authors",
+    response_model=AuthorSearchResponse,
+    responses={422: {"description": "consulta demasiado corta o parámetros inválidos"}},
+)
 def search_authors(
-    q: str = Query(..., min_length=1, max_length=100,
-                   description="Nombre (sin distinguir mayúsculas ni tildes) o ID Scopus exacto"),
+    q: str = Query(
+        ..., min_length=1, max_length=100, description="Nombre (sin distinguir mayúsculas ni tildes) o ID Scopus exacto"
+    ),
     limit: int = Query(10, ge=1, le=MAX_LIMIT),
     controller: AuthorController = Depends(get_author_controller),
 ) -> AuthorSearchResponse:

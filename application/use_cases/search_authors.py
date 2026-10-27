@@ -72,7 +72,7 @@ def within_one_edit(a: str, b: str) -> bool:
     i = 0
     while i < len(a) and a[i] == b[i]:
         i += 1
-    return a[i:] == b[i + 1:]
+    return a[i:] == b[i + 1 :]
 
 
 def word_score(token: str, word: str) -> float:
@@ -81,8 +81,12 @@ def word_score(token: str, word: str) -> float:
         return EXACT
     if word.startswith(token):
         return PREFIX
-    if len(token) >= MIN_TYPO_CHARS and len(word) >= MIN_TYPO_CHARS and word[0] == token[0] \
-            and within_one_edit(token, word):
+    if (
+        len(token) >= MIN_TYPO_CHARS
+        and len(word) >= MIN_TYPO_CHARS
+        and word[0] == token[0]
+        and within_one_edit(token, word)
+    ):
         return TYPO
     if len(word) == 1 and len(token) > 1 and token[0] == word:
         return INITIAL
@@ -157,10 +161,18 @@ class SearchAuthors:
             score, surname_hit = match
             if len(tokens) > 1 and not surname_hit:
                 continue
-            ranked.append((-score, not surname_hit, _tier(entry.names, text), -(entry.summary.article_count or 0),
-                           entry.names[0], entry.summary))
+            ranked.append(
+                (
+                    -score,
+                    not surname_hit,
+                    _tier(entry.names, text),
+                    -(entry.summary.article_count or 0),
+                    entry.names[0],
+                    entry.summary,
+                )
+            )
         ranked.sort(key=lambda r: r[:5])
-        return [r[5] for r in ranked[:query.limit]]
+        return [r[5] for r in ranked[: query.limit]]
 
     def _score_vocabulary(self, token: str) -> dict[str, float]:
         return {w: s for w in self._vocabulary if (s := word_score(token, w)) > 0}

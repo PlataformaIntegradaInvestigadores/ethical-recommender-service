@@ -27,8 +27,7 @@ class RecommendRequest(BaseModel):
     alpha: float = Field(1.0, ge=0.0, le=1.0, description="1 = Average (centroide); <1 mezcla Most Pleasure")
     fairness: FairnessOptions = Field(default_factory=FairnessOptions)
 
-    model_config = {"json_schema_extra": {"examples": [
-        {"author_ids": ["10040712400", "15842091200"], "top_k": 20}]}}
+    model_config = {"json_schema_extra": {"examples": [{"author_ids": ["10040712400", "15842091200"], "top_k": 20}]}}
 
 
 class ResearcherOut(BaseModel):

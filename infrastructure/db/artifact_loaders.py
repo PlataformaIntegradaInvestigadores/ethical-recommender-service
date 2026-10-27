@@ -71,8 +71,9 @@ class CsvMetadataRepository:
     exported before that column existed) they are read from the raw Scopus ``authors.csv`` when given.
     """
 
-    def __init__(self, metadata_path: Path | None = None, profiles_path: Path | None = None,
-                 authors_path: Path | None = None):
+    def __init__(
+        self, metadata_path: Path | None = None, profiles_path: Path | None = None, authors_path: Path | None = None
+    ):
         self._profiles: dict[str, ResearcherProfile] = {}
         self._article_counts: dict[str, int] = {}
         self._full_names: dict[str, str] = {}
@@ -86,18 +87,24 @@ class CsvMetadataRepository:
                 inst = row.institution if isinstance(row.institution, str) and row.institution else UNKNOWN_INSTITUTION
                 name = row.author_name if isinstance(row.author_name, str) else None
                 self._profiles[row.author_id] = ResearcherProfile(
-                    row.author_id, name, inst, str(row.low_visibility).strip().lower() in {"true", "1"})
+                    row.author_id, name, inst, str(row.low_visibility).strip().lower() in {"true", "1"}
+                )
             self._article_counts = _article_counts(frame)
             if "full_name" in frame.columns:
-                self._full_names = {a: n.strip() for a, n in zip(frame["author_id"], frame["full_name"])
-                                    if isinstance(n, str) and n.strip()}
+                self._full_names = {
+                    a: n.strip()
+                    for a, n in zip(frame["author_id"], frame["full_name"])
+                    if isinstance(n, str) and n.strip()
+                }
             self.source = str(metadata_path)
         elif profiles_path and Path(profiles_path).is_file():
             header = pd.read_csv(profiles_path, nrows=0).columns
             cols = [c for c in ("author_id", "author_name", "article_count") if c in header]
             frame = pd.read_csv(profiles_path, dtype=str, usecols=cols)
-            self._profiles = {a: ResearcherProfile(a, n if isinstance(n, str) else None)
-                              for a, n in zip(frame["author_id"], frame["author_name"])}
+            self._profiles = {
+                a: ResearcherProfile(a, n if isinstance(n, str) else None)
+                for a, n in zip(frame["author_id"], frame["author_name"])
+            }
             self._article_counts = _article_counts(frame)
             self.source = str(profiles_path)
         if not self._full_names and authors_path and Path(authors_path).is_file():
@@ -107,9 +114,17 @@ class CsvMetadataRepository:
         return self._profiles.get(author_id) or ResearcherProfile(author_id)
 
     def summaries(self) -> list[AuthorSummary]:
-        return [AuthorSummary(p.author_id, p.name, p.institution, p.low_visibility,
-                              self._article_counts.get(p.author_id), self._full_names.get(p.author_id))
-                for p in self._profiles.values()]
+        return [
+            AuthorSummary(
+                p.author_id,
+                p.name,
+                p.institution,
+                p.low_visibility,
+                self._article_counts.get(p.author_id),
+                self._full_names.get(p.author_id),
+            )
+            for p in self._profiles.values()
+        ]
 
     def full_name(self, author_id: str) -> str | None:
         return self._full_names.get(author_id)
@@ -136,6 +151,8 @@ def read_full_names(authors_path: Path, wanted: set[str] | None = None) -> dict[
     if wanted is not None:
         frame = frame[frame["identifier"].isin(wanted)]
     frame = frame.drop_duplicates("identifier")
-    names = {a: compose_full_name(f, l) for a, f, l in zip(frame["identifier"], frame["first_name"],
-                                                           frame["last_name"])}
+    names = {
+        a: compose_full_name(first, last)
+        for a, first, last in zip(frame["identifier"], frame["first_name"], frame["last_name"])
+    }
     return {a: n for a, n in names.items() if n}

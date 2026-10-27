@@ -27,8 +27,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         edges, survivors = load_clean_edges()
-        authors = etl.read_csv(etl.RAW_DIR / etl.AUTHORS_FILE, [etl.AUTHOR_ID_COL, etl.AUTHOR_NAME_COL],
-                               [etl.AUTHOR_ID_COL])
+        authors = etl.read_csv(
+            etl.RAW_DIR / etl.AUTHORS_FILE, [etl.AUTHOR_ID_COL, etl.AUTHOR_NAME_COL], [etl.AUTHOR_ID_COL]
+        )
     except DataLoadError as exc:
         logging.error("%s", exc)
         return 1
@@ -39,15 +40,17 @@ def main(argv: list[str] | None = None) -> int:
     full_names = read_full_names(etl.RAW_DIR / etl.AUTHORS_FILE)
     if not full_names:
         logging.warning("authors.csv lacks first_name/last_name; full_name will be empty")
-    out = pd.DataFrame({
-        "author_id": ids,
-        "author_name": [names.get(a) for a in ids],
-        "institution": [institutions.get(a, UNKNOWN_INSTITUTION) for a in ids],
-        "low_visibility": [bool(vis.at[a, "protected"]) for a in ids],
-        "article_count": [int(vis.at[a, "article_count"]) for a in ids],
-        "coauthor_degree": [int(vis.at[a, "coauthor_degree"]) for a in ids],
-        "full_name": [full_names.get(a) for a in ids],
-    })
+    out = pd.DataFrame(
+        {
+            "author_id": ids,
+            "author_name": [names.get(a) for a in ids],
+            "institution": [institutions.get(a, UNKNOWN_INSTITUTION) for a in ids],
+            "low_visibility": [bool(vis.at[a, "protected"]) for a in ids],
+            "article_count": [int(vis.at[a, "article_count"]) for a in ids],
+            "coauthor_degree": [int(vis.at[a, "coauthor_degree"]) for a in ids],
+            "full_name": [full_names.get(a) for a in ids],
+        }
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(args.output, index=False)
     logging.info("Wrote %d authors to %s (%s)", len(out), args.output, stats)
