@@ -15,3 +15,15 @@ class ResearcherProfile:
     name: str | None = None
     institution: str = UNKNOWN_INSTITUTION
     low_visibility: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class AuthorSummary:
+    """Searchable author entry (profile plus publication count) used by the team builder UI."""
+
+    author_id: str
+    name: str | None = None
+    institution: str = UNKNOWN_INSTITUTION
+    low_visibility: bool = False
+    article_count: int | None = None
+    full_name: str | None = None  # "Apellido, Nombre" from Scopus first/last name; None when unknown

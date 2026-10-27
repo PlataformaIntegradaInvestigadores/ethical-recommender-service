@@ -1,4 +1,4 @@
-"""Export author_metadata.csv (name, primary institution, low-visibility flag) for the API.
+"""Export author_metadata.csv (name, full name, primary institution, low-visibility flag) for the API.
 
 Uses the same institution mapping and visibility rule as 04_run_rerank_experiment.py.
 Run: python -m infrastructure.scripts.05_export_author_metadata
@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from domain.entities.research_group import UNKNOWN_INSTITUTION
+from infrastructure.db.artifact_loaders import read_full_names
 from infrastructure.db.csv_sources import DataLoadError, etl, load_clean_edges, primary_institutions, visibility_table
 
 DEFAULT_OUTPUT = etl.PROCESSED_DIR / "author_metadata.csv"
@@ -35,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     institutions, stats = primary_institutions(ids, edges)
     vis = visibility_table(edges, survivors).set_index("author_id")
     names = authors.drop_duplicates(etl.AUTHOR_ID_COL).set_index(etl.AUTHOR_ID_COL)[etl.AUTHOR_NAME_COL]
+    full_names = read_full_names(etl.RAW_DIR / etl.AUTHORS_FILE)
+    if not full_names:
+        logging.warning("authors.csv lacks first_name/last_name; full_name will be empty")
     out = pd.DataFrame({
         "author_id": ids,
         "author_name": [names.get(a) for a in ids],
@@ -42,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         "low_visibility": [bool(vis.at[a, "protected"]) for a in ids],
         "article_count": [int(vis.at[a, "article_count"]) for a in ids],
         "coauthor_degree": [int(vis.at[a, "coauthor_degree"]) for a in ids],
+        "full_name": [full_names.get(a) for a in ids],
     })
     args.output.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(args.output, index=False)

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 
 import numpy as np
 
-from domain.entities.researcher import ResearcherProfile
+from domain.entities.researcher import AuthorSummary, ResearcherProfile
 
 
 class AuthorEmbeddingRepository(Protocol):
@@ -28,3 +29,7 @@ class AuthorMetadataRepository(Protocol):
     """Lookup of researcher metadata (name, primary institution, low-visibility flag)."""
 
     def get(self, author_id: str) -> ResearcherProfile: ...
+
+    def summaries(self) -> Sequence[AuthorSummary]:
+        """All known authors (searchable catalogue); order is not significant."""
+        ...

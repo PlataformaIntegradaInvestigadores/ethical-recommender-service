@@ -163,12 +163,15 @@ longitud máxima y formato de entrada del mapping (`título[SEP]resumen` y `[CLS
 Capas (Clean Architecture):
 
 - `domain/entities/researcher.py`, `domain/repositories/author_repositories.py`: entidad y puertos.
+- `application/use_cases/search_authors.py`: búsqueda de autores para el autocompletado
+  del frontend (sin distinguir mayúsculas ni tildes; ID Scopus exacto; solo autores con embedding).
 - `application/use_cases/recommend_collaborators.py`: caso de uso; reutiliza
   `group_scoring` (centroide Average + K-NN), `fair_reranker` (R1: λ=0.8, tope 3 por
   institución, cuota 20 % de baja visibilidad, umbral 0.5) y `ranking_metrics`.
 - `infrastructure/db/artifact_loaders.py`: carga `.npy`, mapeo y metadatos.
 - `infrastructure/api/`: `main.py` (app + lifespan), `settings.py`, `dependencies.py`,
-  `controllers/`, `v1/endpoints/recommend.py`; esquemas en `infrastructure/schemas/`.
+  `controllers/`, `v1/endpoints/recommend.py` y `v1/endpoints/authors.py`; esquemas en
+  `infrastructure/schemas/`.
 
 Ejecución local en Windows (PowerShell):
 
@@ -180,12 +183,47 @@ Ejecución local en Windows (PowerShell):
 $env:RECO_EMBEDDINGS_PATH = "D:\ruta\author_embeddings.npy"
 $env:RECO_MAPPING_PATH    = "D:\ruta\author_index_mapping.json"
 $env:RECO_METADATA_PATH   = "D:\ruta\author_metadata.csv"
-.\.venv\Scripts\python.exe -m uvicorn infrastructure.api.main:app --reload
+# Opcional: orígenes CORS (por defecto http://localhost:4200,http://127.0.0.1:4200; "" lo desactiva)
+$env:RECO_CORS_ORIGINS    = "http://localhost:4200,http://127.0.0.1:4200"
+.\.venv\Scripts\python.exe -m uvicorn infrastructure.api.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+El frontend de Centinela (`centinela-front`, rama `feature/ethical-team-recommender`) consume
+este servicio desde la página **Conformar equipo** (`http://localhost:4200/home/team-builder`).
+`ng serve` reenvía `/api/recommender/*` a `http://localhost:8000/*` (`proxy.conf.json`), así que
+el navegador hace peticiones del mismo origen; CORS solo se usa si un cliente llama directo a `:8000`.
+Orden de arranque: primero este servicio (puerto 8000) y luego `npm start` en el frontend.
 
 Abrir http://127.0.0.1:8000/docs (Swagger UI). `GET /health` informa modelo y nº de autores.
 Sin `author_metadata.csv` el servicio usa los nombres de `filtered_authors_profiles.csv`
 e institución `UNKNOWN` (sin tope ni cuota efectiva).
+
+Búsqueda de autores (autocompletado del equipo a-priori):
+
+```
+GET /api/v1/authors?q=pablo piedrahita&limit=10   # nombre y apellido, en cualquier orden
+GET /api/v1/authors?q=Piedrahita P.               # formato Scopus
+GET /api/v1/authors?q=10040712400                 # ID Scopus exacto
+```
+
+Devuelve `{query, count, results: [{author_id, name, institution, low_visibility, article_count,
+full_name}]}`. `name` es el nombre Scopus (`Piedrahita P.`) y `full_name` el nombre completo
+`Apellido, Nombre` (`Piedrahita, Paolo`) o `null` si no se conoce.
+
+Búsqueda flexible: se normaliza el texto (minúsculas, sin tildes ni puntuación) y cada palabra
+de la consulta debe coincidir con una palabra distinta del nombre Scopus o del nombre completo,
+en cualquier orden: palabra exacta, prefijo (`piedra`), un error de tipeo en palabras de 4+
+letras (`pablo` ~ `paolo`), inicial (`pablo` ~ `P.`) o subcadena. Con dos o más palabras al
+menos una debe coincidir con un apellido, para que `Pablo Piedrahita` no devuelva a otro
+"Pablo" por la inicial `P.`. Orden: mayor puntaje de coincidencia, apellido encontrado, nombre
+exacto o prefijo, más publicaciones. Solo devuelve autores con fila en la matriz de embeddings,
+de modo que cualquier resultado se puede enviar a `/api/v1/recommend`. `limit` va de 1 a 50
+(defecto 10); una consulta con menos de 2 letras o dígitos responde 422.
+
+`full_name` sale de la columna `full_name` de `author_metadata.csv` (script 05, desde
+`first_name`/`last_name` de `data/raw/authors.csv`). Si el CSV de metadatos es anterior y no la
+trae, el servicio lee `data/raw/authors.csv` (`RECO_AUTHORS_PATH`) al arrancar; sin ninguno de
+los dos la búsqueda sigue funcionando sobre el nombre Scopus (iniciales).
 
 Ejemplo `POST /api/v1/recommend`:
 
