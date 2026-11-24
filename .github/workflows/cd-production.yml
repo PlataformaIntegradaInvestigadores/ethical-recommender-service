@@ -46,7 +46,7 @@ jobs:
         run: |
           python -m pytest -v --tb=short -m "not integration" \
             --junitxml=report-unitarios-prod.xml \
-            --cov=app --cov-report=term --cov-fail-under=0
+            --cov --cov-report=term --cov-fail-under=0
       - name: Subir resultados
         uses: actions/upload-artifact@v7
         if: always()
@@ -79,7 +79,7 @@ jobs:
           set +e
           python -m pytest -v --tb=short -m "integration" \
             --junitxml=report-integracion-prod.xml \
-            --cov=app --cov-report=term --cov-fail-under=0
+            --cov --cov-report=term --cov-fail-under=0
           code=$?
           set -e
           # pytest devuelve 5 cuando no hay tests con la marca: no es un fallo.
